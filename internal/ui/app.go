@@ -2,6 +2,7 @@ package ui
 
 import (
 	"github.com/rivo/tview"
+	"github.com/sagikazarmark/slog-shim"
 )
 
 // App 应用界面
@@ -10,23 +11,28 @@ type App struct {
 
 	Main  *Pages
 	views map[string]tview.Primitive
+
+	logger *slog.Logger
 }
 
 // NewApp 新建
-func NewApp() *App {
+func NewApp(logger *slog.Logger) *App {
 	a := App{
 		Application: tview.NewApplication(),
-		Main:        NewPages(),
+		Main:        NewPages(logger),
+		logger:      logger.With("module", "ui-app"),
 	}
 
 	a.views = map[string]tview.Primitive{
-		"menu": NewMenu(),
+		"menu": NewMenu(logger),
 	}
 	return &a
 }
 
 // Init 初始化
 func (a *App) Init() {
+	a.logger.Debug("init app start ...")
+	defer a.logger.Debug("init app end ...")
 	a.setupApp()
 
 	a.SetRoot(a.Main, true).EnableMouse(true)

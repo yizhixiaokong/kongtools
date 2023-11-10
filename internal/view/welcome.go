@@ -1,6 +1,10 @@
 package view
 
-import "github.com/rivo/tview"
+import (
+	"log/slog"
+
+	"github.com/rivo/tview"
+)
 
 // WelcomeMsg 欢迎页
 var WelcomeMsg = []string{
@@ -15,12 +19,15 @@ var WelcomeMsg = []string{
 // Welcome 欢迎页
 type Welcome struct {
 	*tview.TextView
+
+	logger *slog.Logger
 }
 
 // NewWelcome 新建
-func NewWelcome() *Welcome {
+func NewWelcome(logger *slog.Logger) *Welcome {
 	w := Welcome{
 		TextView: tview.NewTextView(),
+		logger:   logger.With("module", "view-welcome"),
 	}
 
 	w.SetBorder(true)
@@ -35,6 +42,7 @@ func NewWelcome() *Welcome {
 }
 
 func (w *Welcome) refreshWelcome() {
+	w.logger.Debug("refresh welcome ...")
 	w.Clear()
 
 	for _, line := range WelcomeMsg {
