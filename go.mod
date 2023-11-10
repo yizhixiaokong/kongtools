@@ -1,12 +1,15 @@
 module kongtools
 
-go 1.19
+go 1.21.4
 
 require (
-	github.com/rivo/tview v0.0.0-20231022175332-f7f32ad28104
-	github.com/spf13/cobra v1.7.0
+	github.com/rivo/tview v0.0.0-20231102183219-1b91b8131c43
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.17.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+require github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -21,7 +24,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/sagikazarmark/locafero v0.3.0 // indirect
-	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect

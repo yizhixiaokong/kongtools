@@ -3,7 +3,9 @@ Copyright © 2023 yizhixiaokong
 */
 package main
 
-import "kongtools/cmd"
+import (
+	"kongtools/cmd"
+)
 
 func main() {
 	cmd.Execute()

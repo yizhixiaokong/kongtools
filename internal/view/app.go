@@ -2,6 +2,7 @@ package view
 
 import (
 	"kongtools/internal/ui"
+	"log/slog"
 
 	"github.com/rivo/tview"
 )
@@ -10,27 +11,34 @@ import (
 type App struct {
 	*ui.App
 	Content *ui.Pages
+
+	logger *slog.Logger
 }
 
 // NewApp 新建
-func NewApp() *App {
+func NewApp(logger *slog.Logger) *App {
 	a := App{
-		App:     ui.NewApp(),
-		Content: ui.NewPages(),
+		App:     ui.NewApp(logger),
+		Content: ui.NewPages(logger),
+		logger:  logger.With("module", "view-app"),
 	}
 
-	a.Views()["welcome"] = NewWelcome()
+	a.Views()["welcome"] = NewWelcome(logger)
 
 	return &a
 }
 
 // Init 初始化
 func (a *App) Init() error {
+	a.logger.Debug("init app start ...")
+	defer a.logger.Debug("init app end ...")
+
 	a.App.Init()
 
 	// a.Menu().AddItem("Test1", "Press to test1", rune('a'+0), nil) //! test
 	// a.Menu().AddItem("Test2", "Press to test2", rune('a'+1), nil) //! test
 	a.Menu().AddItem("Quit", "Press to exit", rune('q'), func() {
+		a.logger.Debug("quit app ...")
 		a.Application.Stop()
 	})
 	// a.Menu().SetSelectedFunc(func(i int, mainText, secondaryText string, r rune) {
@@ -44,6 +52,9 @@ func (a *App) Init() error {
 
 // Run 运行
 func (a *App) Run() error {
+	a.logger.Debug("run app start ...")
+	defer a.logger.Debug("run app end ...")
+
 	a.Content.AddPage("welcome", a.Welcome(), true, true)
 	a.Main.SwitchToPage("main")
 
