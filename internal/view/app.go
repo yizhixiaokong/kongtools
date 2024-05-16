@@ -35,15 +35,49 @@ func (a *App) Init() error {
 
 	a.App.Init()
 
-	// a.Menu().AddItem("Test1", "Press to test1", rune('a'+0), nil) //! test
-	// a.Menu().AddItem("Test2", "Press to test2", rune('a'+1), nil) //! test
+	a.Menu().AddItem("Welcome", "Welcome page", rune('w'), func() {
+		a.logger.Debug("switch to welcome page ...")
+		a.Content.SwitchToPage("welcome")
+	})
+
+	// ! 用来测试page切换的,可删
+	a.Menu().AddItem("Add Page", "Add a new page", rune('a'), func() {
+		a.logger.Debug("add page ...")
+		textView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetRegions(true).
+			SetText("This is a new page.")
+		textView.SetBorder(true)
+		backButton := tview.NewButton("Back").SetSelectedFunc(func() {
+			a.Main.SwitchToPage("main")
+		})
+		a.Main.AddPage("page", tview.NewFlex().SetDirection(tview.FlexRow).
+			AddItem(textView, 0, 1, false).AddItem(backButton, 1, 1, true),
+			true, false)
+
+		a.Menu().AddItem("Switch Page", "Switch to new page", 0, func() {
+			a.Main.SwitchToPage("page")
+		})
+	})
+	// ! 用来测试Main的Content切换,可删
+	a.Menu().AddItem("Add Content", "Add a new content", rune('c'), func() {
+		a.logger.Debug("add content ...")
+		textView := tview.NewTextView().
+			SetDynamicColors(true).
+			SetRegions(true).
+			SetText("This is a new content.")
+		textView.SetBorder(true)
+		a.Content.AddPage("content2", textView,
+			true, false)
+		a.Menu().AddItem("Switch Content", "Switch to new content", 0, func() {
+			a.Content.SwitchToPage("content2")
+		})
+	})
+
 	a.Menu().AddItem("Quit", "Press to exit", rune('q'), func() {
 		a.logger.Debug("quit app ...")
 		a.Application.Stop()
 	})
-	// a.Menu().SetSelectedFunc(func(i int, mainText, secondaryText string, r rune) {
-	// 	a.Welcome().SetTitle(mainText) //! test
-	// })
 
 	a.flexLayout()
 
