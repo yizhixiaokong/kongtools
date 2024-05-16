@@ -9,7 +9,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require github.com/sagikazarmark/slog-shim v0.1.0 // indirect
+require github.com/sagikazarmark/slog-shim v0.1.0
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
