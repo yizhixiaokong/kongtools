@@ -40,7 +40,21 @@ func (a *App) Init() error {
 		a.Content.SwitchToPage("welcome")
 	})
 
-	// ! 用来测试page切换的,可删
+	// a.TestSwitchPagesAndContent() // test switch pages and content logic
+
+	a.Menu().AddItem("Quit", "Press to exit", rune('q'), func() {
+		a.logger.Debug("quit app ...")
+		a.Application.Stop()
+	})
+
+	a.flexLayout()
+
+	return nil
+}
+
+// TestSwitchPagesAndContent 用来测试页面和内容切换的方法
+func (a *App) TestSwitchPagesAndContent() {
+	// 用来测试page切换的,可删
 	a.Menu().AddItem("Add Page", "Add a new page", rune('a'), func() {
 		a.logger.Debug("add page ...")
 		textView := tview.NewTextView().
@@ -59,7 +73,8 @@ func (a *App) Init() error {
 			a.Main.SwitchToPage("page")
 		})
 	})
-	// ! 用来测试Main的Content切换,可删
+
+	// 用来测试Main的Content切换,可删
 	a.Menu().AddItem("Add Content", "Add a new content", rune('c'), func() {
 		a.logger.Debug("add content ...")
 		textView := tview.NewTextView().
@@ -73,15 +88,6 @@ func (a *App) Init() error {
 			a.Content.SwitchToPage("content2")
 		})
 	})
-
-	a.Menu().AddItem("Quit", "Press to exit", rune('q'), func() {
-		a.logger.Debug("quit app ...")
-		a.Application.Stop()
-	})
-
-	a.flexLayout()
-
-	return nil
 }
 
 // Run 运行
