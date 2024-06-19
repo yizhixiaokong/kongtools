@@ -52,11 +52,15 @@ func Execute() {
 // InitLogger 初始化日志
 func InitLogger() { // TODO: new package
 	ll := &lumberjack.Logger{
-		Filename: "log/log.log", // filename // TODO: set from config
-		MaxSize:  10,            // megabytes // TODO: set from config
-		MaxAge:   30,            // days // TODO: set from config
+		Filename:   "log/log.log", // filename // TODO: set from config
+		MaxSize:    10,            // megabytes // TODO: set from config
+		MaxAge:     30,            // days // TODO: set from config
+		MaxBackups: 15,            // max backups // TODO: set from config
 	}
-	ll.Rotate() // 每次启动程序都会归档之前的日志
+	err := ll.Rotate() // 每次启动程序都会归档之前的日志
+	if err != nil {
+		panic(err)
+	}
 
 	// w := io.MultiWriter(os.Stdout, ll) // 同时写文件和屏幕 // !不需要
 
