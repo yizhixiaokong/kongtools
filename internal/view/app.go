@@ -24,6 +24,7 @@ func NewApp(logger *slog.Logger) *App {
 	}
 
 	a.Views()["welcome"] = NewWelcome(logger)
+	a.Views()["todo-list"] = NewTodoList(logger, []Task{})
 
 	return &a
 }
@@ -38,6 +39,11 @@ func (a *App) Init() error {
 	a.Menu().AddItem("Welcome", "Welcome page", rune('w'), func() {
 		a.logger.Debug("switch to welcome page ...")
 		a.Content.SwitchToPage("welcome")
+	})
+
+	a.Menu().AddItem("Todo List", "Todo list page", rune('t'), func() {
+		a.logger.Debug("switch to todo list page ...")
+		a.Content.SwitchToPage("todo-list")
 	})
 
 	// a.TestSwitchPagesAndContent() // test switch pages and content logic
@@ -95,9 +101,11 @@ func (a *App) Run() error {
 	a.logger.Debug("run app start ...")
 	defer a.logger.Debug("run app end ...")
 
+	// 运行时将各个功能page加到Content中
 	a.Content.AddPage("welcome", a.Welcome(), true, true)
-	a.Main.SwitchToPage("main")
+	a.Content.AddPage("todo-list", a.TodoList(), true, false)
 
+	a.Main.SwitchToPage("main")
 	return a.Application.Run()
 }
 
@@ -125,4 +133,9 @@ func (a *App) buildContent() tview.Primitive {
 // Welcome 欢迎页
 func (a *App) Welcome() *Welcome {
 	return a.Views()["welcome"].(*Welcome)
+}
+
+// (page)TodoList 任务列表
+func (a *App) TodoList() *TodoList {
+	return a.Views()["todo-list"].(*TodoList)
 }
