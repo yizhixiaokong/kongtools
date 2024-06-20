@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"kongtools/internal/view"
 	"os"
+	"path/filepath"
 
 	"log/slog"
 
@@ -72,11 +73,17 @@ func InitLogger() { // TODO: new package
 }
 
 func init() {
-
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kongtools.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kongtoolsrc)")
 }
+
+type Config struct {
+	Key1 string
+	Key2 string
+}
+
+var config Config
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
@@ -88,10 +95,10 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
-		// Search config in home directory with name ".kongtools" (without extension).
+		// Search config in home directory with name ".kongtoolsrc" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".kongtools")
+		viper.SetConfigName(".kongtoolsrc")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -99,5 +106,45 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	} else if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		// Config file not found; create a new one
+		createDefaultConfig()
+	} else {
+		// Config file was found but another error was produced
+		cobra.CheckErr(err)
+	}
+
+	// Unmarshal the config into a struct
+	if err := viper.Unmarshal(&config); err != nil {
+		cobra.CheckErr(err)
+	}
+
+	fmt.Printf("Config: %+v\n", config) // TODO: for test, delete
+}
+
+// createDefaultConfig creates a default config file
+func createDefaultConfig() {
+	home, err := os.UserHomeDir()
+	cobra.CheckErr(err)
+
+	configPath := filepath.Join(home, ".kongtoolsrc")
+
+	// Define default configuration
+	// TODO: set default configuration
+	defaultConfig := []byte(`# Default configuration
+key1: value1
+key2: value2
+`)
+
+	// Write the default config to the file
+	err = os.WriteFile(configPath, defaultConfig, 0644)
+	cobra.CheckErr(err)
+
+	fmt.Fprintf(os.Stderr, "Created default config file: %s\n", configPath)
+	viper.SetConfigFile(configPath)
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	} else {
+		cobra.CheckErr(err)
 	}
 }
