@@ -1,7 +1,10 @@
 package view
 
 import (
+	"encoding/json"
 	"log/slog"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -21,28 +24,39 @@ type TodoList struct {
 	tasks *tview.List
 
 	// data
+	savePath  string
 	taskItems []Task
 
 	// control
 	editMode  bool
 	editIndex int
 	hintTimer *time.Timer
+	saveTimer *time.Timer
+	mutex     *sync.Mutex
 
 	// global
 	logger *slog.Logger
 }
 
-func NewTodoList(logger *slog.Logger, tasks []Task) *TodoList {
+func NewTodoList(logger *slog.Logger, savePath string) *TodoList {
 	todoList := &TodoList{
 		Flex:      tview.NewFlex(),
 		input:     tview.NewInputField(),
 		hint:      tview.NewTextView(),
 		tasks:     tview.NewList(),
-		taskItems: tasks,
+		savePath:  savePath,
+		taskItems: []Task{},
 		editMode:  false,
 		editIndex: -1,
 		hintTimer: nil,
+		saveTimer: nil,
+		mutex:     &sync.Mutex{},
 		logger:    logger.With("module", "view-todo-list"),
+	}
+
+	err := todoList.loadTasks(savePath)
+	if err != nil {
+		todoList.logger.Error("load tasks error", slog.String("error", err.Error()))
 	}
 
 	todoList.initTasks()
@@ -175,9 +189,10 @@ func (t *TodoList) AddTask() {
 		}
 		t.taskItems = append(t.taskItems, newTask)
 		t.updateTasksDisplay(len(t.taskItems) - 1)
-		// t.displayTask(newTask)
 		t.input.SetText("")
 		t.logger.Debug("Task added", slog.String("task", task))
+
+		t.scheduleSave(t.savePath)
 	}
 }
 
@@ -203,6 +218,7 @@ func (t *TodoList) DeleteTask() {
 	t.updateTasksDisplay(index)
 	t.logger.Debug("Task deleted", slog.String("task", task))
 
+	t.scheduleSave(t.savePath)
 }
 
 func (t *TodoList) EditTask() {
@@ -233,6 +249,8 @@ func (t *TodoList) SaveEdit() {
 			t.updateInputLabel()
 			t.updateTasksDisplay(index)
 			t.logger.Debug("Task edited", slog.String("task", task))
+
+			t.scheduleSave(t.savePath)
 		}
 	}
 }
@@ -256,6 +274,8 @@ func (t *TodoList) CompleteTask() {
 	t.taskItems[index].Completed = !t.taskItems[index].Completed
 	t.updateTasksDisplay(index)
 	t.logger.Debug("Task completion toggled", slog.String("task", t.taskItems[index].Title), slog.Bool("completed", t.taskItems[index].Completed))
+
+	t.scheduleSave(t.savePath)
 }
 
 func (t *TodoList) configureHandlers() {
@@ -321,4 +341,60 @@ func (t *TodoList) setupLayout() {
 	t.SetBorder(true).
 		SetTitle("To-Do List").
 		SetTitleAlign(tview.AlignCenter)
+}
+
+func (t *TodoList) loadTasks(savePath string) error {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	data, err := os.ReadFile(savePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			t.logger.Debug("No tasks found", slog.String("savePath", savePath))
+			t.taskItems = []Task{}
+			return nil
+		}
+		return err
+	}
+
+	err = json.Unmarshal(data, &t.taskItems)
+	if err != nil {
+		return err
+	}
+
+	t.logger.Info("Tasks loaded", slog.String("savePath", savePath))
+	return nil
+}
+
+func (t *TodoList) saveTasks(savePath string) error {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	data, err := json.Marshal(t.taskItems)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(savePath, data, 0644)
+	if err != nil {
+		return err
+	}
+
+	t.logger.Info("Tasks saved", slog.String("savePath", savePath))
+	return nil
+}
+
+func (t *TodoList) scheduleSave(savePath string) {
+	if t.saveTimer != nil {
+		t.saveTimer.Stop()
+	}
+
+	t.saveTimer = time.AfterFunc(1*time.Second, func() {
+		err := t.saveTasks(savePath)
+		if err != nil {
+			t.logger.Error("Failed to save tasks", slog.String("error", err.Error()))
+		}
+
+		t.updateHint("Tasks saved to file:" + savePath)
+	})
 }

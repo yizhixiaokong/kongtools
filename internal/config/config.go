@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"kongtools/internal/pkg/log"
+	"kongtools/internal/view"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 type config struct {
 	Log log.Config
+	App view.Config
 }
 
 var (
@@ -60,6 +62,8 @@ func initConfig() {
 
 	// Unmarshal the config into a struct
 	cobra.CheckErr(viper.Unmarshal(&_config))
+
+	fmt.Printf("Config: %+v", _config)
 }
 
 // Define default configuration
@@ -81,7 +85,7 @@ func createDefaultConfig() {
 	configPath := filepath.Join(home, ".kongtoolsrc")
 
 	// Write the default config to the file
-	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig)), 0644))
+	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, view.DefaultConfig)), 0644))
 
 	fmt.Fprintf(os.Stderr, "Created default config file: %s\n", configPath)
 	viper.SetConfigFile(configPath)
