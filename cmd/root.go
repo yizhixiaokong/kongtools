@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 
 func rootRun(cmd *cobra.Command, args []string) {
 	slog.Debug("run app start ...")
-	app := view.NewApp(slog.Default())
+	app := view.NewApp(slog.Default(), config.Config().App)
 	if err := app.Init(); err != nil {
 		slog.Error("init app error", slog.String("error", err.Error()))
 		return
@@ -47,7 +47,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(func() {
-		cfg := config.Config()
+		cfg := config.Config() // init config
 		log.InitLogger(cfg.Log)
 	})
 

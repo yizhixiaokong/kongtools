@@ -7,24 +7,34 @@ import (
 	"github.com/rivo/tview"
 )
 
+type Config struct {
+	TasksSavePath string
+}
+
+const DefaultConfig = `app:
+  tasksSavePath: tasks.json
+`
+
 // App 应用视图
 type App struct {
 	*ui.App
 	Content *ui.Pages
 
+	cfg    Config
 	logger *slog.Logger
 }
 
 // NewApp 新建
-func NewApp(logger *slog.Logger) *App {
+func NewApp(logger *slog.Logger, cfg Config) *App {
 	a := App{
 		App:     ui.NewApp(logger),
 		Content: ui.NewPages(logger),
+		cfg:     cfg,
 		logger:  logger.With("module", "view-app"),
 	}
 
 	a.Views()["welcome"] = NewWelcome(logger)
-	a.Views()["todo-list"] = NewTodoList(logger, []Task{})
+	a.Views()["todo-list"] = NewTodoList(logger, cfg.TasksSavePath)
 
 	return &a
 }
