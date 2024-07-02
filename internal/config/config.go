@@ -63,7 +63,7 @@ func initConfig() {
 	// Unmarshal the config into a struct
 	cobra.CheckErr(viper.Unmarshal(&_config))
 
-	fmt.Printf("Config: %+v", _config)
+	// fmt.Printf("Config: %+v", _config)
 }
 
 // Define default configuration

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -371,6 +372,12 @@ func (t *TodoList) saveTasks(savePath string) error {
 	defer t.mutex.Unlock()
 
 	data, err := json.Marshal(t.taskItems)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(savePath)
+	err = os.MkdirAll(dir, 0755)
 	if err != nil {
 		return err
 	}
