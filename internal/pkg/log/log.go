@@ -23,7 +23,7 @@ type Config struct {
 const DefaultConfig = `log:
   level: debug
   addSource: true
-  filename: kongtools.log
+  filename: logs/kongtools.log
   maxSize: 10
   maxBackups: 3
   maxAge: 7
