@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"kongtools/internal/pkg/log"
+	"kongtools/internal/pkg/paths"
 	"kongtools/internal/view"
 	"os"
 	"path/filepath"
@@ -15,7 +16,8 @@ import (
 const (
 	// Define default configuration
 	defaultCfgStr = `# Default configuration`
-	defaultName   = ".kongtoolsrc"
+	appName       = "kongtools"
+	configName    = "config"
 )
 
 var (
@@ -39,27 +41,31 @@ func Config() config {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// Find home directory.
-	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
-
-	// Search config in home directory with the default name.
-	viper.AddConfigPath(home)
-	viper.SetConfigType("yaml")
-	viper.SetConfigName(defaultName)
+	var configFilePath string
 
 	if CfgFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(CfgFile)
+		configFilePath = CfgFile
+		// Ensure the directory exists for custom config file
+		if dir := filepath.Dir(configFilePath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				cobra.CheckErr(fmt.Errorf("failed to create config directory %s: %w", dir, err))
+			}
+		}
+	} else {
+		// Get config file path using paths package
+		configFilePath = paths.ConfigFile(configName + ".yaml")
 	}
+
+	viper.SetConfigFile(configFilePath)
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err != nil {
-		switch err.(type) {
-		case viper.ConfigFileNotFoundError:
+		// Check if error is because file doesn't exist
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok || os.IsNotExist(err) {
 			// Config file not found; create a new one
-			createDefaultConfig()
-		default:
+			createDefaultConfig(configFilePath)
+		} else {
 			// Config file was found but another error was produced
 			cobra.CheckErr(err)
 		}
@@ -84,13 +90,9 @@ func DefaultConfig(configs ...string) (config string) {
 	return
 }
 
-// createDefaultConfig creates a default config file in the user's home directory
-func createDefaultConfig() {
-	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
-
-	configPath := filepath.Join(home, defaultName)
-
+// createDefaultConfig creates a default config file in the config directory
+func createDefaultConfig(configPath string) {
+	// Directory is already ensured by paths.ConfigFile
 	// Write the default config to the file
 	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, view.DefaultConfig)), 0644))
 
