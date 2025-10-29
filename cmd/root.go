@@ -5,7 +5,7 @@ package cmd
 
 import (
 	"kongtools/internal/config"
-	"kongtools/internal/view"
+	"kongtools/internal/tui"
 	"os"
 
 	"log/slog"
@@ -25,7 +25,7 @@ var rootCmd = &cobra.Command{
 
 func rootRun(cmd *cobra.Command, args []string) {
 	slog.Debug("run app start ...")
-	app := view.NewApp(slog.Default(), config.Config().App)
+	app := tui.NewApp(slog.Default(), config.Config().App)
 	if err := app.Init(); err != nil {
 		slog.Error("init app error", slog.String("error", err.Error()))
 		return

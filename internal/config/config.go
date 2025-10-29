@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"kongtools/internal/pkg/log"
 	"kongtools/internal/pkg/paths"
-	"kongtools/internal/view"
+	"kongtools/internal/tui"
 	"os"
 	"path/filepath"
 	"sync"
@@ -29,7 +29,7 @@ var (
 
 type config struct {
 	Log log.Config
-	App view.Config
+	App tui.Config
 }
 
 func Config() config {
@@ -95,7 +95,7 @@ func DefaultConfig(configs ...string) (config string) {
 func createDefaultConfig(configPath string) {
 	// Directory is already ensured by paths.ConfigFile
 	// Write the default config to the file
-	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, view.DefaultConfig)), 0644))
+	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, tui.DefaultConfig)), 0644))
 
 	fmt.Fprintf(os.Stderr, "Created default config file: %s\n", configPath)
 	viper.SetConfigFile(configPath)
