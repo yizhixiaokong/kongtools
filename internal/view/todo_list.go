@@ -371,7 +371,7 @@ func (t *TodoList) saveTasks(savePath string) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	data, err := json.Marshal(t.taskItems)
+	data, err := json.MarshalIndent(t.taskItems, "", "  ")
 	if err != nil {
 		return err
 	}

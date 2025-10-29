@@ -1,6 +1,7 @@
 package view
 
 import (
+	"kongtools/internal/pkg/paths"
 	"kongtools/internal/ui"
 	"log/slog"
 
@@ -12,7 +13,7 @@ type Config struct {
 }
 
 const DefaultConfig = `app:
-  tasksSavePath: tasks.json
+  tasksSavePath: 
 `
 
 // App 应用视图
@@ -31,6 +32,10 @@ func NewApp(logger *slog.Logger, cfg Config) *App {
 		Content: ui.NewPages(logger),
 		cfg:     cfg,
 		logger:  logger.With("module", "view-app"),
+	}
+
+	if cfg.TasksSavePath == "" {
+		cfg.TasksSavePath = paths.DataFile("tasks.json")
 	}
 
 	a.Views()["welcome"] = NewWelcome(logger)
