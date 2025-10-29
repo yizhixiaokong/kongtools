@@ -67,8 +67,8 @@ clean:
 # 安装到系统
 install: build
 	@echo "Installing $(APP_NAME)..."
-	@mkdir -p $(HOME)/bin
-	cp $(BUILD_DIR)/$(APP_NAME) $(HOME)/bin/
+	@mkdir -p $(HOME)/.local/bin
+	cp $(BUILD_DIR)/$(APP_NAME) $(HOME)/.local/bin/
 
 # 显示版本信息
 version:

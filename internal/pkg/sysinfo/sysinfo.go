@@ -6,6 +6,8 @@ import (
 	"kongtools/internal/pkg/version"
 	"log/slog"
 	"runtime"
+
+	"github.com/spf13/viper"
 )
 
 // PrintSystemInfo 打印系统信息到日志
@@ -22,7 +24,7 @@ func PrintSystemInfo() {
 	)
 
 	// 打印配置文件路径
-	slog.Info("Config file", slog.String("path", config.CfgFile))
+	slog.Info("Config file", slog.String("path", viper.ConfigFileUsed()))
 
 	// 打印目录信息
 	dirs := paths.All()
