@@ -11,6 +11,7 @@ import (
 	"log/slog"
 
 	"kongtools/internal/pkg/log"
+	"kongtools/internal/pkg/sysinfo"
 
 	"github.com/spf13/cobra"
 )
@@ -49,6 +50,7 @@ func init() {
 	cobra.OnInitialize(func() {
 		cfg := config.Config() // init config
 		log.InitLogger(cfg.Log)
+		sysinfo.PrintSystemInfo() // print system info after all initialization
 	})
 
 	rootCmd.PersistentFlags().StringVar(&config.CfgFile, "config", "", "config file (default is $HOME/.kongtoolsrc)")

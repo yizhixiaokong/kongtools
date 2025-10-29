@@ -55,6 +55,7 @@ func initConfig() {
 	} else {
 		// Get config file path using paths package
 		configFilePath = paths.ConfigFile(configName + ".yaml")
+		CfgFile = configFilePath
 	}
 
 	viper.SetConfigFile(configFilePath)
