@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
 
@@ -37,6 +38,7 @@ type ListPage struct {
 	height    int
 	input     string
 	selected  int
+	inputMode bool // 是否处于输入模式（焦点在输入框）
 	editMode  bool
 	editIndex int
 	hint      string
@@ -45,7 +47,7 @@ type ListPage struct {
 	keys todoKeyMap
 }
 
-// todoKeyMap Todo 页面快捷键映射
+// type todoKeyMap Todo 页面快捷键映射
 type todoKeyMap struct {
 	Add     key.Binding
 	Edit    key.Binding
@@ -62,7 +64,7 @@ type todoKeyMap struct {
 
 // ShortHelp 返回简短帮助信息
 func (k todoKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Add, k.Toggle, k.Delete, k.Back}
+	return []key.Binding{k.Add, k.Edit, k.Toggle, k.Delete, k.Back}
 }
 
 // FullHelp 返回完整帮助信息
@@ -77,15 +79,15 @@ func (k todoKeyMap) FullHelp() [][]key.Binding {
 var todoKeys = todoKeyMap{
 	Add: key.NewBinding(
 		key.WithKeys("a"),
-		key.WithHelp("a", "添加任务"),
+		key.WithHelp("a", "进入输入模式"),
 	),
 	Edit: key.NewBinding(
 		key.WithKeys("enter"),
 		key.WithHelp("enter", "编辑"),
 	),
 	Delete: key.NewBinding(
-		key.WithKeys("delete", "x"),
-		key.WithHelp("x/del", "删除"),
+		key.WithKeys("delete", "d"),
+		key.WithHelp("d/del", "删除"),
 	),
 	Toggle: key.NewBinding(
 		key.WithKeys(" "),
@@ -147,24 +149,39 @@ func (m *ListPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+	case tea.MouseMsg:
+		// 处理鼠标滚动
+		if msg.Action == tea.MouseActionPress {
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				if m.selected > 0 {
+					m.selected--
+				}
+			case tea.MouseButtonWheelDown:
+				if m.selected < len(m.tasks)-1 {
+					m.selected++
+				}
+			}
+		}
+
 	case tea.KeyMsg:
 		// 输入模式的按键处理
-		if m.editMode || len(m.input) > 0 {
+		if m.inputMode {
 			return m.handleInputKeys(msg)
 		}
 
 		// 列表模式的按键处理
 		return m.handleListKeys(msg)
 
-	case SaveSuccessMsg:
+	case messages.SaveSuccessMsg:
 		m.hint = "✓ 已保存: " + msg.Path
 		cmds = append(cmds, m.clearHintAfter(3*time.Second))
 
-	case SaveFailedMsg:
+	case messages.SaveFailedMsg:
 		m.hint = "✗ 保存失败: " + msg.Err.Error()
 		cmds = append(cmds, m.clearHintAfter(3*time.Second))
 
-	case ClearHintMsg:
+	case messages.ClearHintMsg:
 		m.hint = ""
 	}
 
@@ -179,16 +196,26 @@ func (m *ListPage) handleInputKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
 	case tea.KeyEnter:
 		if m.editMode {
 			cmds = append(cmds, m.saveEdit())
-		} else {
+		} else if m.input != "" {
 			cmds = append(cmds, m.addTask())
 		}
+		// 添加/编辑完成后退出输入模式
+		m.inputMode = false
 
 	case tea.KeyEsc:
+		// ESC 退出输入模式
 		m.cancelEdit()
+		m.inputMode = false
 
 	case tea.KeyBackspace:
 		if len(m.input) > 0 {
 			m.input = m.input[:len(m.input)-1]
+		}
+
+	case tea.KeySpace:
+		// 在输入模式下，空格键就是输入空格，不触发 Toggle
+		if len(m.input) < 80 {
+			m.input += " "
 		}
 
 	case tea.KeyRunes:
@@ -208,6 +235,14 @@ func (m *ListPage) handleListKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
+	case key.Matches(msg, m.keys.Add):
+		// 按 'a' 进入输入模式
+		m.inputMode = true
+		m.input = ""
+		m.editMode = false
+		m.hint = "💡 输入新任务内容，按 Enter 确认，ESC 取消"
+		cmds = append(cmds, m.clearHintAfter(5*time.Second))
+
 	case key.Matches(msg, m.keys.Up):
 		if m.selected > 0 {
 			m.selected--
@@ -220,6 +255,7 @@ func (m *ListPage) handleListKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Edit):
 		m.editTask()
+		m.inputMode = true
 
 	case key.Matches(msg, m.keys.Toggle):
 		cmds = append(cmds, m.toggleComplete())
@@ -230,17 +266,11 @@ func (m *ListPage) handleListKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
 	case key.Matches(msg, m.keys.Back):
 		// 返回主菜单
 		return m, func() tea.Msg {
-			return SwitchPageMsg{Page: "main"}
+			return messages.SwitchPageMsg{Page: "main"}
 		}
 
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
-
-	default:
-		// 允许直接输入
-		if msg.Type == tea.KeyRunes {
-			m.input += string(msg.Runes)
-		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -266,21 +296,29 @@ func (m *ListPage) View() string {
 		Render(styles.TitleStyle.Render("📋 Todo List"))
 
 	// 输入框部分（左对齐）
-	inputLabel := "＋ 新任务: "
-	if m.editMode {
-		inputLabel = "✎ 编辑: "
+	var inputLine string
+	if m.inputMode {
+		// 在输入模式下显示输入框和光标
+		inputLabel := "＋ 新任务: "
+		if m.editMode {
+			inputLabel = "✎ 编辑: "
+		}
+
+		labelStyle := styles.TodoInputLabelStyle
+		inputStyle := styles.TodoInputStyle
+		cursorStyle := styles.TodoCursorStyle
+
+		inputText := m.input
+		if len(inputText) < 80 {
+			inputText += cursorStyle.Render("▊") // 使用更明显的光标
+		}
+
+		inputLine = labelStyle.Render(inputLabel) + inputStyle.Render(inputText)
+	} else {
+		// 非输入模式，显示提示
+		hintStyle := lipgloss.NewStyle().Foreground(styles.TextSubtle)
+		inputLine = hintStyle.Render("按 a 进入输入模式添加任务")
 	}
-
-	labelStyle := styles.TodoInputLabelStyle
-	inputStyle := styles.TodoInputStyle
-	cursorStyle := styles.TodoCursorStyle
-
-	inputText := m.input
-	if len(inputText) < 80 {
-		inputText += cursorStyle.Render(" ")
-	}
-
-	inputLine := labelStyle.Render(inputLabel) + inputStyle.Render(inputText)
 
 	// 提示信息（左对齐）
 	var hintLine string
@@ -445,21 +483,21 @@ func (m *ListPage) scheduleSave() tea.Cmd {
 		time.Sleep(500 * time.Millisecond)
 		if err := m.SaveTasks(); err != nil {
 			m.logger.Error("failed to save tasks", slog.String("error", err.Error()))
-			return SaveFailedMsg{Err: err}
+			return messages.SaveFailedMsg{Err: err}
 		}
-		return SaveSuccessMsg{Path: m.savePath}
+		return messages.SaveSuccessMsg{Path: m.savePath}
 	}
 }
 
 // getHelpTasks 获取帮助任务
 func (m *ListPage) getHelpTasks() []Task {
 	return []Task{
-		{Title: "💡 在上方输入框中输入你的第一个待办任务", Completed: false},
-		{Title: "👏 按 Enter 添加任务到列表", Completed: false},
+		{Title: "💡 按 a 进入输入模式添加任务", Completed: false},
+		{Title: "👏 输入完成后按 Enter 确认，ESC 取消", Completed: false},
 		{Title: "📝 选中任务并按 Enter 编辑任务", Completed: false},
-		{Title: "🤷 按 Esc 取消编辑", Completed: false},
-		{Title: "🥷 按 Delete 或 x 删除选中的任务", Completed: false},
-		{Title: "✅ 按空格键标记任务为已完成", Completed: false},
+		{Title: "� 按 Delete 或 x 删除选中的任务", Completed: false},
+		{Title: "✅ 按空格键标记任务为已完成/未完成", Completed: false},
+		{Title: "🖱️  使用鼠标滚轮或方向键浏览任务", Completed: false},
 	}
 }
 
@@ -561,24 +599,6 @@ func (m *ListPage) toggleComplete() tea.Cmd {
 // clearHintAfter 延时清除提示
 func (m *ListPage) clearHintAfter(duration time.Duration) tea.Cmd {
 	return tea.Tick(duration, func(t time.Time) tea.Msg {
-		return ClearHintMsg{}
+		return messages.ClearHintMsg{}
 	})
-}
-
-// SaveSuccessMsg 保存成功消息
-type SaveSuccessMsg struct {
-	Path string
-}
-
-// SaveFailedMsg 保存失败消息
-type SaveFailedMsg struct {
-	Err error
-}
-
-// ClearHintMsg 清除提示消息
-type ClearHintMsg struct{}
-
-// SwitchPageMsg 页面切换消息
-type SwitchPageMsg struct {
-	Page string
 }

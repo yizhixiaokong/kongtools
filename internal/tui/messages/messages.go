@@ -1,4 +1,4 @@
-package tui
+package messages
 
 import "time"
 
@@ -35,6 +35,12 @@ type SaveSuccessMsg struct {
 type SaveFailedMsg struct {
 	Err error
 }
+
+// WelcomeTimeoutMsg 欢迎页超时消息
+type WelcomeTimeoutMsg struct{}
+
+// ClearHintMsg 清除提示消息
+type ClearHintMsg struct{}
 
 // TickMsg 定时器消息
 type TickMsg struct {

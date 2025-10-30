@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
 
@@ -82,14 +83,11 @@ func NewWelcomePage() *WelcomePage {
 	}
 }
 
-// WelcomeTimeoutMsg 欢迎页超时消息
-type WelcomeTimeoutMsg struct{}
-
 // Init 实现 Page 接口
 func (m *WelcomePage) Init() tea.Cmd {
 	// 启动3秒定时器
 	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
-		return WelcomeTimeoutMsg{}
+		return messages.WelcomeTimeoutMsg{}
 	})
 }
 
@@ -104,18 +102,18 @@ func (m *WelcomePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Enter):
 			// Enter 或空格键，切换到主菜单
 			return m, func() tea.Msg {
-				return SwitchPageMsg{Page: "main"}
+				return messages.SwitchPageMsg{Page: "main"}
 			}
 		case key.Matches(msg, m.keys.Quit):
 			// q 或 ctrl+c，退出
 			return m, tea.Quit
 		}
-	case WelcomeTimeoutMsg:
+	case messages.WelcomeTimeoutMsg:
 		// 超时后发送切换页面消息
 		if !m.autoSkipped {
 			m.autoSkipped = true
 			return m, func() tea.Msg {
-				return SwitchPageMsg{Page: "main"}
+				return messages.SwitchPageMsg{Page: "main"}
 			}
 		}
 	}

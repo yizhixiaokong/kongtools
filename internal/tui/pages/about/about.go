@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"kongtools/internal/pkg/version"
-	"kongtools/internal/tui/pages"
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
 
@@ -72,7 +72,7 @@ func (m *AboutPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.Back):
 			return m, func() tea.Msg {
-				return pages.SwitchPageMsg{Page: "main"}
+				return messages.SwitchPageMsg{Page: "main"}
 			}
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit

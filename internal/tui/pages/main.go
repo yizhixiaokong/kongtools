@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
 
@@ -152,7 +153,7 @@ func (m *MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if ok {
 				// 发送页面切换消息
 				return m, func() tea.Msg {
-					return SwitchPageMsg{Page: i.page}
+					return messages.SwitchPageMsg{Page: i.page}
 				}
 			}
 		}
@@ -193,9 +194,4 @@ func (m *MainPage) SetSize(width, height int) {
 	m.height = height
 	m.list.SetWidth(width)
 	m.list.SetHeight(height - 4)
-}
-
-// SwitchPageMsg 页面切换消息
-type SwitchPageMsg struct {
-	Page string
 }

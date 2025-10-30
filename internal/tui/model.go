@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/pages"
 	"kongtools/internal/tui/pages/about"
 	"kongtools/internal/tui/pages/settings"
@@ -62,7 +63,7 @@ type Model struct {
 
 	// 通知
 	notification      string
-	notificationLevel NotificationLevel
+	notificationLevel messages.NotificationLevel
 
 	// 窗口大小
 	width  int
@@ -145,7 +146,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-	case pages.SwitchPageMsg:
+	case messages.SwitchPageMsg:
 		switch msg.Page {
 		case "main":
 			m.currentPage = PageMain
@@ -162,7 +163,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case pages.WelcomeTimeoutMsg:
+	case messages.WelcomeTimeoutMsg:
 		// 欢迎页超时，自动跳转到主菜单
 		if m.currentPage == PageWelcome {
 			m.currentPage = PageMain
@@ -170,30 +171,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case todolist.SwitchPageMsg:
-		switch msg.Page {
-		case "main":
-			m.currentPage = PageMain
-			m.logger.Debug("switch to main page from todo")
-		}
-		return m, nil
-
-	case todolist.SaveSuccessMsg:
+	case messages.SaveSuccessMsg:
 		m.notification = "✓ 已保存: " + msg.Path
-		m.notificationLevel = NotificationSuccess
+		m.notificationLevel = messages.NotificationSuccess
 		return m, m.clearNotificationAfter()
 
-	case todolist.SaveFailedMsg:
+	case messages.SaveFailedMsg:
 		m.notification = "✗ 保存失败: " + msg.Err.Error()
-		m.notificationLevel = NotificationError
+		m.notificationLevel = messages.NotificationError
 		return m, m.clearNotificationAfter()
 
-	case NotificationMsg:
+	case messages.NotificationMsg:
 		m.notification = msg.Message
 		m.notificationLevel = msg.Level
 		return m, m.clearNotificationAfter()
 
-	case ClearNotificationMsg:
+	case messages.ClearNotificationMsg:
 		m.notification = ""
 		return m, nil
 	}
@@ -271,11 +264,11 @@ func (m Model) renderHeader() string {
 	if m.notification != "" {
 		var notifStyle lipgloss.Style
 		switch m.notificationLevel {
-		case NotificationSuccess:
+		case messages.NotificationSuccess:
 			notifStyle = styles.SuccessStyle
-		case NotificationWarning:
+		case messages.NotificationWarning:
 			notifStyle = styles.WarningStyle
-		case NotificationError:
+		case messages.NotificationError:
 			notifStyle = styles.ErrorStyle
 		default:
 			notifStyle = styles.InfoStyle
@@ -372,6 +365,6 @@ func (m Model) getContentHeight() int {
 // clearNotificationAfter 延时清除通知
 func (m *Model) clearNotificationAfter() tea.Cmd {
 	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
-		return ClearNotificationMsg{}
+		return messages.ClearNotificationMsg{}
 	})
 }

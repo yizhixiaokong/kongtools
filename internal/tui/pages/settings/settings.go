@@ -6,7 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"kongtools/internal/tui/pages"
+	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
 
@@ -69,7 +69,7 @@ func (m *SettingsPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.Back):
 			return m, func() tea.Msg {
-				return pages.SwitchPageMsg{Page: "main"}
+				return messages.SwitchPageMsg{Page: "main"}
 			}
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
