@@ -1,6 +1,6 @@
 # Makefile for kongtools
 
-.PHONY: build run clean test deps help install dev version
+.PHONY: build run clean test deps help install dev version changelog changelog-init
 
 APP_NAME := kongtools
 BUILD_DIR := build
@@ -78,17 +78,49 @@ version:
 	@echo "Build Time: $(BUILD_TIME)"
 	@echo "Go Version: $(GO_VERSION)"
 
+# git-chglog: 初始化配置
+changelog-init:
+	@echo "Initializing git-chglog configuration..."
+	@if ! command -v git-chglog >/dev/null 2>&1; then \
+		echo "Error: git-chglog is not installed."; \
+		echo "Install it with: go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest"; \
+		exit 1; \
+	fi
+	git-chglog --init
+
+# git-chglog: 生成 CHANGELOG
+changelog:
+	@echo "Generating CHANGELOG.md..."
+	@if ! command -v git-chglog >/dev/null 2>&1; then \
+		echo "Error: git-chglog is not installed."; \
+		echo "Install it with: go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest"; \
+		exit 1; \
+	fi
+	git-chglog -o CHANGELOG.md
+
+# git-chglog: 生成指定版本的 CHANGELOG
+changelog-tag:
+	@if [ -z "$(TAG)" ]; then \
+		echo "Error: TAG is required. Usage: make changelog-tag TAG=v1.0.0"; \
+		exit 1; \
+	fi
+	@echo "Generating CHANGELOG.md for tag $(TAG)..."
+	git-chglog -o CHANGELOG.md $(TAG)
+
 # 显示帮助信息
 help:
 	@echo "Available targets:"
-	@echo "  build      - Build the application with version info"
-	@echo "  build-dev  - Build the application without version info (faster)"
-	@echo "  run        - Build and run the application"
-	@echo "  dev        - Run in development mode (go run)"
-	@echo "  test       - Run tests"
-	@echo "  clean      - Clean build files"
-	@echo "  install    - Install to ~/bin"
-	@echo "  deps       - Install dependencies"
-	@echo "  version    - Show version information"
-	@echo "  help       - Show this help"
+	@echo "  build           - Build the application with version info"
+	@echo "  build-dev       - Build the application without version info (faster)"
+	@echo "  run             - Build and run the application"
+	@echo "  dev             - Run in development mode (go run)"
+	@echo "  test            - Run tests"
+	@echo "  clean           - Clean build files"
+	@echo "  install         - Install to ~/bin"
+	@echo "  deps            - Install dependencies"
+	@echo "  version         - Show version information"
+	@echo "  changelog-init  - Initialize git-chglog configuration"
+	@echo "  changelog       - Generate CHANGELOG.md from all commits"
+	@echo "  changelog-tag   - Generate CHANGELOG.md for specific tag (use TAG=v1.0.0)"
+	@echo "  help            - Show this help"
 

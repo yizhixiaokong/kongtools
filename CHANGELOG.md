@@ -1,6 +1,13 @@
 <a name="unreleased"></a>
 ## [Unreleased]
 
+### Chore
+- tui messages type package definition
+- Add change log template and configuration file
+
+### Fix
+- 修正代办列表帮助信息，一些emoji会导致界面渲染错位
+
 
 <a name="v0.8.0"></a>
 ## [v0.8.0] - 2025-10-29
