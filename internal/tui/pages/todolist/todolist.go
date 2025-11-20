@@ -495,9 +495,8 @@ func (m *ListPage) getHelpTasks() []Task {
 		{Title: "💡 按 a 进入输入模式添加任务", Completed: false},
 		{Title: "👏 输入完成后按 Enter 确认，ESC 取消", Completed: false},
 		{Title: "📝 选中任务并按 Enter 编辑任务", Completed: false},
-		{Title: "� 按 Delete 或 x 删除选中的任务", Completed: false},
+		{Title: "❌ 按 Delete 或 x 删除选中的任务", Completed: false},
 		{Title: "✅ 按空格键标记任务为已完成/未完成", Completed: false},
-		{Title: "🖱️  使用鼠标滚轮或方向键浏览任务", Completed: false},
 	}
 }
 
