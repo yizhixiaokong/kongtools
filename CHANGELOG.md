@@ -2,10 +2,17 @@
 ## [Unreleased]
 
 
+<a name="v0.9.2"></a>
+## [v0.9.2] - 2025-11-26
+### Feat
+- 添加图片预览功能，支持通过 URL 或本地路径加载图片
+
+
 <a name="v0.9.1"></a>
 ## [v0.9.1] - 2025-11-26
 ### Chore
 - 添加发布新版本的目标，生成 CHANGELOG 并打标签
+- **changelog:** update changelog for v0.9.1
 
 ### Refactor
 - 重构 Model 以使用页面映射，简化页面管理逻辑
@@ -109,7 +116,8 @@
 - update welcome page
 
 
-[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.2...HEAD
+[v0.9.2]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.1...v0.9.2
 [v0.9.1]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.0...v0.9.1
 [v0.9.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.8.0...v0.9.0
 [v0.8.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.7.3...v0.8.0
