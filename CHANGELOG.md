@@ -1,12 +1,20 @@
 <a name="unreleased"></a>
 ## [Unreleased]
 
+
+<a name="v0.9.0"></a>
+## [v0.9.0] - 2025-11-26
 ### Chore
+- 更新 Makefile，添加 changelog 相关命令并初始化配置
 - tui messages type package definition
 - Add change log template and configuration file
 
 ### Fix
 - 修正代办列表帮助信息，一些emoji会导致界面渲染错位
+
+### Refactor
+- 重构 TodoList 页面，使用 bubbles 组件库
+- 移除应用初始化逻辑，直接在运行时加载任务
 
 
 <a name="v0.8.0"></a>
@@ -91,7 +99,8 @@
 - update welcome page
 
 
-[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.0...HEAD
+[v0.9.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.8.0...v0.9.0
 [v0.8.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.7.3...v0.8.0
 [v0.7.3]: https://github.com/yizhixiaokong/kongtools/compare/v0.7.0...v0.7.3
 [v0.7.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.7.2...v0.7.0
