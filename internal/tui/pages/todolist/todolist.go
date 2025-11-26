@@ -150,8 +150,8 @@ var todoKeys = todoKeyMap{
 	),
 }
 
-// NewListPage 创建 Todo List 页面
-func NewListPage(logger *slog.Logger, savePath string) *ListPage {
+// NewTodoListPage 创建 Todo List 页面
+func NewTodoListPage(logger *slog.Logger, savePath string) *ListPage {
 	// 初始化列表
 	delegate := itemDelegate{}
 	l := list.New([]list.Item{}, delegate, 0, 0)

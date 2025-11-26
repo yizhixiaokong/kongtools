@@ -13,6 +13,7 @@ import (
 	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/pages"
 	"kongtools/internal/tui/pages/about"
+	"kongtools/internal/tui/pages/image"
 	"kongtools/internal/tui/pages/settings"
 	"kongtools/internal/tui/pages/todolist"
 	"kongtools/internal/tui/styles"
@@ -25,6 +26,7 @@ const (
 	PageWelcome PageType = iota
 	PageMain
 	PageTodo
+	PageImage
 	PageSettings
 	PageAbout
 )
@@ -37,6 +39,8 @@ func (p PageType) String() string {
 		return "主菜单"
 	case PageTodo:
 		return "待办事项"
+	case PageImage:
+		return "图片预览"
 	case PageSettings:
 		return "设置"
 	case PageAbout:
@@ -85,7 +89,8 @@ func NewModel(logger *slog.Logger, cfg Config) *Model {
 	// 初始化页面
 	m.pages[PageWelcome] = pages.NewWelcomePage()
 	m.pages[PageMain] = pages.NewMainPage()
-	m.pages[PageTodo] = todolist.NewListPage(logger, cfg.TasksSavePath)
+	m.pages[PageTodo] = todolist.NewTodoListPage(logger, cfg.TasksSavePath)
+	m.pages[PageImage] = image.NewImagePage()
 	m.pages[PageSettings] = settings.NewSettingsPage()
 	m.pages[PageAbout] = about.NewAboutPage()
 
@@ -145,6 +150,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "todo":
 			m.currentPage = PageTodo
 			m.logger.Debug("switch to todo page")
+		case "image":
+			m.currentPage = PageImage
+			m.logger.Debug("switch to image page")
 		case "settings":
 			m.currentPage = PageSettings
 			m.logger.Debug("switch to settings page")

@@ -105,6 +105,11 @@ func NewMainPage() *MainPage {
 			page:        "todo",
 		},
 		menuItem{
+			title:       "🖼️  Image Viewer",
+			description: "预览图片 (需要 chafa)",
+			page:        "image",
+		},
+		menuItem{
 			title:       "⚙️  Settings",
 			description: "配置应用设置",
 			page:        "settings",
