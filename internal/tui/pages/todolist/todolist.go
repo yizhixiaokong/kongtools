@@ -3,6 +3,7 @@ package todolist
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -30,6 +33,51 @@ type TasksLoadedMsg struct {
 	Tasks []Task
 }
 
+// item 实现 list.Item 接口
+type item struct {
+	task *Task
+}
+
+func (i item) Title() string       { return i.task.Title }
+func (i item) Description() string { return "" }
+func (i item) FilterValue() string { return i.task.Title }
+
+// itemDelegate 列表项渲染委托
+type itemDelegate struct{}
+
+func (d itemDelegate) Height() int                             { return 1 }
+func (d itemDelegate) Spacing() int                            { return 0 }
+func (d itemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(item)
+	if !ok {
+		return
+	}
+
+	str := fmt.Sprintf("%s", i.Title())
+
+	// 选中状态
+	fn := styles.TodoItemStyle.Render
+	if index == m.Index() {
+		fn = func(s ...string) string {
+			return styles.TodoSelectedStyle.Render("> " + strings.Join(s, " "))
+		}
+	} else {
+		fn = func(s ...string) string {
+			return styles.TodoItemStyle.Render("  " + strings.Join(s, " "))
+		}
+	}
+
+	// 完成状态
+	checkbox := "[ ]"
+	if i.task.Completed {
+		checkbox = "[✓]"
+		str = styles.TodoCompletedStyle.Render(str)
+	}
+
+	fmt.Fprint(w, fn(checkbox, str))
+}
+
 // ListPage Todo List 页面
 type ListPage struct {
 	// 数据
@@ -38,15 +86,15 @@ type ListPage struct {
 	mutex    sync.Mutex
 	logger   *slog.Logger
 
-	// UI 状态
+	// UI 组件
+	list  list.Model
+	input textinput.Model
+
+	// 状态
 	width     int
 	height    int
-	input     string
-	selected  int
-	inputMode bool // 是否处于输入模式（焦点在输入框）
-	editMode  bool
-	editIndex int
-	hint      string
+	adding    bool // 是否正在添加/编辑
+	editIndex int  // -1 表示添加，>=0 表示编辑
 
 	// 快捷键
 	keys todoKeyMap
@@ -54,17 +102,12 @@ type ListPage struct {
 
 // type todoKeyMap Todo 页面快捷键映射
 type todoKeyMap struct {
-	Add     key.Binding
-	Edit    key.Binding
-	Delete  key.Binding
-	Toggle  key.Binding
-	Back    key.Binding
-	Quit    key.Binding
-	Up      key.Binding
-	Down    key.Binding
-	Confirm key.Binding
-	Cancel  key.Binding
-	Input   key.Binding
+	Add    key.Binding
+	Edit   key.Binding
+	Delete key.Binding
+	Toggle key.Binding
+	Back   key.Binding
+	Quit   key.Binding
 }
 
 // ShortHelp 返回简短帮助信息
@@ -75,24 +118,23 @@ func (k todoKeyMap) ShortHelp() []key.Binding {
 // FullHelp 返回完整帮助信息
 func (k todoKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Toggle},
-		{k.Edit, k.Delete, k.Add},
-		{k.Back, k.Quit},
+		{k.Add, k.Edit, k.Delete},
+		{k.Toggle, k.Back, k.Quit},
 	}
 }
 
 var todoKeys = todoKeyMap{
 	Add: key.NewBinding(
 		key.WithKeys("a"),
-		key.WithHelp("a", "进入输入模式"),
+		key.WithHelp("a", "添加任务"),
 	),
 	Edit: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "编辑"),
+		key.WithHelp("enter", "编辑任务"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("delete", "d"),
-		key.WithHelp("d/del", "删除"),
+		key.WithHelp("d/del", "删除任务"),
 	),
 	Toggle: key.NewBinding(
 		key.WithKeys(" "),
@@ -106,32 +148,33 @@ var todoKeys = todoKeyMap{
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "退出"),
 	),
-	Up: key.NewBinding(
-		key.WithKeys("up", "k"),
-		key.WithHelp("↑/k", "上移"),
-	),
-	Down: key.NewBinding(
-		key.WithKeys("down", "j"),
-		key.WithHelp("↓/j", "下移"),
-	),
-	Confirm: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "确认"),
-	),
-	Cancel: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "取消"),
-	),
 }
 
 // NewListPage 创建 Todo List 页面
 func NewListPage(logger *slog.Logger, savePath string) *ListPage {
+	// 初始化列表
+	delegate := itemDelegate{}
+	l := list.New([]list.Item{}, delegate, 0, 0)
+	l.Title = "📋 Todo List"
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.SetShowHelp(false) // 我们使用自己的帮助系统或页面底部的帮助
+	l.Styles.Title = styles.TitleStyle
+	l.DisableQuitKeybindings()
+
+	// 初始化输入框
+	ti := textinput.New()
+	ti.Placeholder = "输入任务内容..."
+	ti.CharLimit = 80
+	ti.Width = 40
+
 	return &ListPage{
 		tasks:     []Task{},
 		savePath:  savePath,
-		editMode:  false,
+		list:      l,
+		input:     ti,
+		adding:    false,
 		editIndex: -1,
-		selected:  0,
 		logger:    logger.With("module", "tui-todo"),
 		keys:      todoKeys,
 	}
@@ -166,273 +209,178 @@ func (m *ListPage) loadTasksCmd() tea.Msg {
 
 // Update 实现 Page 接口
 func (m *ListPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-	case tea.MouseMsg:
-		// 处理鼠标滚动
-		if msg.Action == tea.MouseActionPress {
-			switch msg.Button {
-			case tea.MouseButtonWheelUp:
-				if m.selected > 0 {
-					m.selected--
-				}
-			case tea.MouseButtonWheelDown:
-				if m.selected < len(m.tasks)-1 {
-					m.selected++
-				}
-			}
-		}
-
-	case tea.KeyMsg:
-		// 输入模式的按键处理
-		if m.inputMode {
-			return m.handleInputKeys(msg)
-		}
-
-		// 列表模式的按键处理
-		return m.handleListKeys(msg)
-
-	case messages.SaveSuccessMsg:
-		m.hint = "✓ 已保存: " + msg.Path
-		cmds = append(cmds, m.clearHintAfter(3*time.Second))
-
-	case messages.SaveFailedMsg:
-		m.hint = "✗ 保存失败: " + msg.Err.Error()
-		cmds = append(cmds, m.clearHintAfter(3*time.Second))
-
-	case messages.ClearHintMsg:
-		m.hint = ""
+		m.list.SetWidth(msg.Width)
+		m.list.SetHeight(msg.Height - 4) // 留出 header/footer 空间
 
 	case TasksLoadedMsg:
 		m.tasks = msg.Tasks
+		m.updateListItems()
+
+	case messages.SaveSuccessMsg:
+		// 可以显示通知，或者什么都不做
+	case messages.SaveFailedMsg:
+		// 可以显示错误通知
 	}
 
-	return m, tea.Batch(cmds...)
+	// 如果正在添加/编辑，处理输入框逻辑
+	if m.adding {
+		return m.updateInput(msg)
+	}
+
+	// 否则处理列表逻辑
+	return m.updateList(msg)
 }
 
-// handleInputKeys 处理输入模式的按键
-func (m *ListPage) handleInputKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
-	var cmds []tea.Cmd
+// updateInput 处理输入模式的更新
+func (m *ListPage) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 
-	switch msg.Type {
-	case tea.KeyEnter:
-		if m.editMode {
-			cmds = append(cmds, m.saveEdit())
-		} else if m.input != "" {
-			cmds = append(cmds, m.addTask())
-		}
-		// 添加/编辑完成后退出输入模式
-		m.inputMode = false
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			if m.input.Value() != "" {
+				if m.editIndex >= 0 {
+					// 编辑现有任务
+					m.tasks[m.editIndex].Title = m.input.Value()
+				} else {
+					// 添加新任务
+					m.tasks = append(m.tasks, Task{Title: m.input.Value()})
+				}
+				m.updateListItems()
+				cmd = m.scheduleSave()
+			}
+			m.adding = false
+			m.input.Blur()
+			return m, cmd
 
-	case tea.KeyEsc:
-		// ESC 退出输入模式
-		m.cancelEdit()
-		m.inputMode = false
-
-	case tea.KeyBackspace:
-		if len(m.input) > 0 {
-			m.input = m.input[:len(m.input)-1]
-		}
-
-	case tea.KeySpace:
-		// 在输入模式下，空格键就是输入空格，不触发 Toggle
-		if len(m.input) < 80 {
-			m.input += " "
-		}
-
-	case tea.KeyRunes:
-		if len(m.input) < 80 {
-			m.input += string(msg.Runes)
-		} else {
-			m.hint = "⚠ 任务长度不能超过 80 个字符"
-			cmds = append(cmds, m.clearHintAfter(3*time.Second))
+		case tea.KeyEsc:
+			m.adding = false
+			m.input.Blur()
+			return m, nil
 		}
 	}
 
-	return m, tea.Batch(cmds...)
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
 }
 
-// handleListKeys 处理列表模式的按键
-func (m *ListPage) handleListKeys(msg tea.KeyMsg) (*ListPage, tea.Cmd) {
-	var cmds []tea.Cmd
+// updateList 处理列表模式的更新
+func (m *ListPage) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 
-	switch {
-	case key.Matches(msg, m.keys.Add):
-		// 按 'a' 进入输入模式
-		m.inputMode = true
-		m.input = ""
-		m.editMode = false
-		m.hint = "💡 输入新任务内容，按 Enter 确认，ESC 取消"
-		cmds = append(cmds, m.clearHintAfter(5*time.Second))
-
-	case key.Matches(msg, m.keys.Up):
-		if m.selected > 0 {
-			m.selected--
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		// 检查是否匹配自定义快捷键
+		if key.Matches(msg, m.keys.Add) {
+			m.adding = true
+			m.editIndex = -1
+			m.input.SetValue("")
+			m.input.Focus()
+			return m, textinput.Blink
 		}
 
-	case key.Matches(msg, m.keys.Down):
-		if m.selected < len(m.tasks)-1 {
-			m.selected++
+		if key.Matches(msg, m.keys.Edit) {
+			if len(m.tasks) > 0 && m.list.Index() >= 0 {
+				m.adding = true
+				m.editIndex = m.list.Index()
+				m.input.SetValue(m.tasks[m.editIndex].Title)
+				m.input.Focus()
+				return m, textinput.Blink
+			}
 		}
 
-	case key.Matches(msg, m.keys.Edit):
-		m.editTask()
-		m.inputMode = true
-
-	case key.Matches(msg, m.keys.Toggle):
-		cmds = append(cmds, m.toggleComplete())
-
-	case key.Matches(msg, m.keys.Delete):
-		cmds = append(cmds, m.deleteTask())
-
-	case key.Matches(msg, m.keys.Back):
-		// 返回主菜单
-		return m, func() tea.Msg {
-			return messages.SwitchPageMsg{Page: "main"}
+		if key.Matches(msg, m.keys.Delete) {
+			if len(m.tasks) > 0 && m.list.Index() >= 0 {
+				index := m.list.Index()
+				m.tasks = append(m.tasks[:index], m.tasks[index+1:]...)
+				m.updateListItems()
+				// 调整选中项
+				if index >= len(m.tasks) && index > 0 {
+					m.list.Select(index - 1)
+				}
+				return m, m.scheduleSave()
+			}
 		}
 
-	case key.Matches(msg, m.keys.Quit):
-		return m, tea.Quit
+		if key.Matches(msg, m.keys.Toggle) {
+			if len(m.tasks) > 0 && m.list.Index() >= 0 {
+				index := m.list.Index()
+				m.tasks[index].Completed = !m.tasks[index].Completed
+				// 重新生成列表项以更新显示
+				m.updateListItems()
+				// 保持选中位置
+				m.list.Select(index)
+				return m, m.scheduleSave()
+			}
+		}
+
+		if key.Matches(msg, m.keys.Back) {
+			return m, func() tea.Msg {
+				return messages.SwitchPageMsg{Page: "main"}
+			}
+		}
+
+		if key.Matches(msg, m.keys.Quit) {
+			return m, tea.Quit
+		}
 	}
 
-	return m, tea.Batch(cmds...)
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
+}
+
+// updateListItems 更新列表组件的数据
+func (m *ListPage) updateListItems() {
+	items := make([]list.Item, len(m.tasks))
+	for i, t := range m.tasks {
+		// 注意：这里需要传递指针，否则修改不会反映到原始切片
+		// 但由于我们每次都重新生成 items，所以直接传值也可以，
+		// 只要保证 m.tasks 是最新的。
+		// 为了在 item 方法中访问 Task，我们创建一个新的 Task 副本或指针
+		taskCopy := t // 复制一份
+		items[i] = item{task: &taskCopy}
+	}
+	m.list.SetItems(items)
 }
 
 // View 实现 Page 接口
 func (m *ListPage) View() string {
-	if m.width == 0 || m.height == 0 {
-		return "Loading..."
+	if m.adding {
+		return lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				styles.TitleStyle.Render(m.inputTitle()),
+				m.input.View(),
+				styles.SubtitleStyle.Render("(Enter 确认, Esc 取消)"),
+			),
+		)
 	}
 
-	// 定义列表的最大宽度（用于居中）
-	const maxListWidth = 80
-	listWidth := maxListWidth
-	if m.width < maxListWidth {
-		listWidth = m.width - 4 // 留一些边距
-	}
-
-	// 标题部分（居中）
-	title := lipgloss.NewStyle().
-		Width(listWidth).
-		Align(lipgloss.Center).
-		Render(styles.TitleStyle.Render("📋 Todo List"))
-
-	// 输入框部分（左对齐）
-	var inputLine string
-	if m.inputMode {
-		// 在输入模式下显示输入框和光标
-		inputLabel := "＋ 新任务: "
-		if m.editMode {
-			inputLabel = "✎ 编辑: "
-		}
-
-		labelStyle := styles.TodoInputLabelStyle
-		inputStyle := styles.TodoInputStyle
-		cursorStyle := styles.TodoCursorStyle
-
-		inputText := m.input
-		if len(inputText) < 80 {
-			inputText += cursorStyle.Render("▊") // 使用更明显的光标
-		}
-
-		inputLine = labelStyle.Render(inputLabel) + inputStyle.Render(inputText)
-	} else {
-		// 非输入模式，显示提示
-		hintStyle := lipgloss.NewStyle().Foreground(styles.TextSubtle)
-		inputLine = hintStyle.Render("按 a 进入输入模式添加任务")
-	}
-
-	// 提示信息（左对齐）
-	var hintLine string
-	if m.hint != "" {
-		hintStyle := styles.TodoHintStyle
-		hintLine = hintStyle.Render(m.hint)
-	}
-
-	// 任务列表
-	listHeight := m.height - 5
-	if listHeight < 0 {
-		listHeight = 0
-	}
-
-	// 计算显示范围
-	start := 0
-	end := len(m.tasks)
-
-	if end > listHeight {
-		if m.selected >= listHeight {
-			start = m.selected - listHeight + 1
-		}
-		end = start + listHeight
-		if end > len(m.tasks) {
-			end = len(m.tasks)
-			start = end - listHeight
-			if start < 0 {
-				start = 0
-			}
-		}
-	}
-
-	// 构建任务列表项（左对齐）
-	var taskLines []string
-	for i := start; i < end; i++ {
-		task := m.tasks[i]
-
-		checkbox := "[ ]"
-		if task.Completed {
-			checkbox = "[✓]"
-		}
-
-		line := fmt.Sprintf("%s %s", checkbox, task.Title)
-
-		var renderedLine string
-		if i == m.selected {
-			if task.Completed {
-				renderedLine = styles.TodoSelectedCompletedStyle.Render(line)
-			} else {
-				renderedLine = styles.TodoSelectedStyle.Render(line)
-			}
-		} else {
-			if task.Completed {
-				renderedLine = styles.TodoCompletedStyle.Render(line)
-			} else {
-				renderedLine = styles.TodoItemStyle.Render(line)
-			}
-		}
-
-		taskLines = append(taskLines, renderedLine)
-	}
-
-	// 组合所有部分，确保任务列表左对齐
-	var contentParts []string
-	contentParts = append(contentParts, title)
-	contentParts = append(contentParts, inputLine)
-	if hintLine != "" {
-		contentParts = append(contentParts, hintLine)
-	} else {
-		contentParts = append(contentParts, "")
-	}
-	contentParts = append(contentParts, taskLines...)
-
-	// 使用固定宽度的容器，内部左对齐
-	contentBox := lipgloss.NewStyle().
-		Width(listWidth).
-		Align(lipgloss.Left).
-		Render(strings.Join(contentParts, "\n"))
-
-	// 使用 lipgloss.Place 将内容块水平居中
+	// 使用 lipgloss.Place 居中显示列表
+	// 注意：list 组件自带了分页和样式，我们只需要给它足够的空间
 	return lipgloss.Place(
 		m.width,
 		m.height,
 		lipgloss.Center,
 		lipgloss.Top,
-		contentBox,
+		m.list.View(),
 	)
+}
+
+func (m *ListPage) inputTitle() string {
+	if m.editIndex >= 0 {
+		return "编辑任务"
+	}
+	return "添加新任务"
 }
 
 // Title 实现 Page 接口
@@ -449,6 +397,8 @@ func (m *ListPage) Help() help.KeyMap {
 func (m *ListPage) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	m.list.SetWidth(width)
+	m.list.SetHeight(height - 4)
 }
 
 // SaveTasks 保存任务
@@ -493,112 +443,9 @@ func (m *ListPage) scheduleSave() tea.Cmd {
 // getHelpTasks 获取帮助任务
 func (m *ListPage) getHelpTasks() []Task {
 	return []Task{
-		{Title: "💡 按 a 进入输入模式添加任务", Completed: false},
-		{Title: "👏 输入完成后按 Enter 确认，ESC 取消", Completed: false},
-		{Title: "📝 选中任务并按 Enter 编辑任务", Completed: false},
-		{Title: "❌ 按 Delete 或 x 删除选中的任务", Completed: false},
-		{Title: "✅ 按空格键标记任务为已完成/未完成", Completed: false},
+		{Title: "💡 按 a 添加任务", Completed: false},
+		{Title: "📝 按 Enter 编辑任务", Completed: false},
+		{Title: "❌ 按 d 删除任务", Completed: false},
+		{Title: "✅ 按空格键切换完成状态", Completed: false},
 	}
-}
-
-// addTask 添加任务
-func (m *ListPage) addTask() tea.Cmd {
-	if m.input == "" {
-		return nil
-	}
-
-	task := Task{
-		Title:     m.input,
-		Completed: false,
-	}
-
-	m.tasks = append(m.tasks, task)
-	m.input = ""
-	m.selected = len(m.tasks) - 1
-	m.logger.Debug("task added", slog.String("title", task.Title))
-
-	return m.scheduleSave()
-}
-
-// editTask 编辑任务
-func (m *ListPage) editTask() {
-	if len(m.tasks) == 0 || m.selected >= len(m.tasks) {
-		return
-	}
-
-	m.input = m.tasks[m.selected].Title
-	m.editMode = true
-	m.editIndex = m.selected
-	m.logger.Debug("editing task", slog.Int("index", m.editIndex))
-}
-
-// saveEdit 保存编辑
-func (m *ListPage) saveEdit() tea.Cmd {
-	if m.input == "" {
-		m.cancelEdit()
-		return nil
-	}
-
-	if m.editIndex >= 0 && m.editIndex < len(m.tasks) {
-		m.tasks[m.editIndex].Title = m.input
-		m.logger.Debug("task edited", slog.Int("index", m.editIndex), slog.String("title", m.input))
-	}
-
-	m.input = ""
-	m.editMode = false
-	m.editIndex = -1
-
-	return m.scheduleSave()
-}
-
-// cancelEdit 取消编辑
-func (m *ListPage) cancelEdit() {
-	m.input = ""
-	m.editMode = false
-	m.editIndex = -1
-	m.logger.Debug("edit cancelled")
-}
-
-// deleteTask 删除任务
-func (m *ListPage) deleteTask() tea.Cmd {
-	if len(m.tasks) == 0 || m.selected >= len(m.tasks) {
-		return nil
-	}
-
-	if m.editMode {
-		m.hint = "⚠ 编辑模式下不能删除任务"
-		return m.clearHintAfter(3 * time.Second)
-	}
-
-	task := m.tasks[m.selected]
-	m.tasks = append(m.tasks[:m.selected], m.tasks[m.selected+1:]...)
-
-	if m.selected >= len(m.tasks) && m.selected > 0 {
-		m.selected--
-	}
-
-	m.logger.Debug("task deleted", slog.String("title", task.Title))
-
-	return m.scheduleSave()
-}
-
-// toggleComplete 切换完成状态
-func (m *ListPage) toggleComplete() tea.Cmd {
-	if len(m.tasks) == 0 || m.selected >= len(m.tasks) {
-		return nil
-	}
-
-	m.tasks[m.selected].Completed = !m.tasks[m.selected].Completed
-	m.logger.Debug("task completion toggled",
-		slog.Int("index", m.selected),
-		slog.Bool("completed", m.tasks[m.selected].Completed))
-
-	return m.scheduleSave()
-}
-
-// clearHintAfter 延时清除提示
-func (m *ListPage) clearHintAfter(duration time.Duration) tea.Cmd {
-	return tea.Tick(duration, func(t time.Time) tea.Msg {
-		return messages.ClearHintMsg{}
-	})
 }
