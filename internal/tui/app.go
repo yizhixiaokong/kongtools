@@ -26,19 +26,6 @@ func NewApp(logger *slog.Logger, cfg Config) *App {
 	return app
 }
 
-// Init 初始化应用
-func (a *App) Init() error {
-	a.logger.Debug("init bubbletea app start ...")
-	defer a.logger.Debug("init bubbletea app end ...")
-
-	// 初始化模型数据
-	if err := a.model.InitData(); err != nil {
-		return fmt.Errorf("failed to init model: %w", err)
-	}
-
-	return nil
-}
-
 // Run 运行应用
 func (a *App) Run() error {
 	a.logger.Debug("run bubbletea app start ...")

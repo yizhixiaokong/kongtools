@@ -22,14 +22,14 @@ var (
 			BorderForeground(Primary).
 			Padding(0, 1)
 
-	// 直接复用并在需要时通过方法生成新样式（方法本身返回新的 style）
+	// lipgloss 样式方法默认返回新实例，因此可以直接以 TabStyle 为基础派生
 	InactiveTabStyle = TabStyle
 
 	ActiveTabStyle = TabStyle.
 			Border(ActiveTabBorder, true).
 			Bold(true)
 
-		// 标签页间隔
+	// 标签页间隔
 	TabGapStyle = TabStyle.
 			BorderTop(false).
 			BorderLeft(false).
@@ -37,6 +37,7 @@ var (
 
 	// 标签页内容窗口
 	TabWindowStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(Primary).
 			Padding(1, 2).
 			Align(lipgloss.Left)

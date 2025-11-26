@@ -26,10 +26,6 @@ var rootCmd = &cobra.Command{
 func rootRun(cmd *cobra.Command, args []string) {
 	slog.Debug("run app start ...")
 	app := tui.NewApp(slog.Default(), config.Config().App)
-	if err := app.Init(); err != nil {
-		slog.Error("init app error", slog.String("error", err.Error()))
-		return
-	}
 
 	if err := app.Run(); err != nil {
 		slog.Error("run app error", slog.String("error", err.Error()))

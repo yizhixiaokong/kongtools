@@ -95,22 +95,14 @@ func NewModel(logger *slog.Logger, cfg Config) *Model {
 	return m
 }
 
-// InitData 初始化数据
-func (m *Model) InitData() error {
-	m.logger.Debug("init model data start ...")
-	defer m.logger.Debug("init model data end ...")
-
-	if cmd := m.todoPage.Init(); cmd != nil {
-		m.logger.Debug("todo page initialized")
-	}
-
-	return nil
-}
-
 // Init 实现 tea.Model 接口
 func (m Model) Init() tea.Cmd {
 	// 启动欢迎页的定时器
-	return m.welcomePage.Init()
+	// 同时初始化 Todo 页面（加载数据）
+	return tea.Batch(
+		m.welcomePage.Init(),
+		m.todoPage.Init(),
+	)
 }
 
 // Update 实现 tea.Model 接口
@@ -189,6 +181,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearNotificationMsg:
 		m.notification = ""
 		return m, nil
+
+	case todolist.TasksLoadedMsg:
+		newModel, cmd := m.todoPage.Update(msg)
+		m.todoPage = newModel.(*todolist.ListPage)
+		return m, cmd
 	}
 
 	// 将消息传递给当前页面

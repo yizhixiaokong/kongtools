@@ -25,6 +25,11 @@ type Task struct {
 	Completed bool   `json:"completed"`
 }
 
+// TasksLoadedMsg 任务加载成功消息
+type TasksLoadedMsg struct {
+	Tasks []Task
+}
+
 // ListPage Todo List 页面
 type ListPage struct {
 	// 数据
@@ -134,10 +139,29 @@ func NewListPage(logger *slog.Logger, savePath string) *ListPage {
 
 // Init 实现 Page 接口
 func (m *ListPage) Init() tea.Cmd {
-	if err := m.LoadTasks(); err != nil {
+	return m.loadTasksCmd
+}
+
+// loadTasksCmd 加载任务
+func (m *ListPage) loadTasksCmd() tea.Msg {
+	data, err := os.ReadFile(m.savePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			m.logger.Debug("no tasks file found, returning help tasks")
+			return TasksLoadedMsg{Tasks: m.getHelpTasks()}
+		}
 		m.logger.Error("failed to load tasks", slog.String("error", err.Error()))
+		return nil
 	}
-	return nil
+
+	var tasks []Task
+	if err := json.Unmarshal(data, &tasks); err != nil {
+		m.logger.Error("failed to unmarshal tasks", slog.String("error", err.Error()))
+		return nil
+	}
+
+	m.logger.Info("tasks loaded", slog.String("path", m.savePath), slog.Int("count", len(tasks)))
+	return TasksLoadedMsg{Tasks: tasks}
 }
 
 // Update 实现 Page 接口
@@ -183,6 +207,9 @@ func (m *ListPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.ClearHintMsg:
 		m.hint = ""
+
+	case TasksLoadedMsg:
+		m.tasks = msg.Tasks
 	}
 
 	return m, tea.Batch(cmds...)
@@ -422,32 +449,6 @@ func (m *ListPage) Help() help.KeyMap {
 func (m *ListPage) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-}
-
-// LoadTasks 加载任务
-func (m *ListPage) LoadTasks() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	data, err := os.ReadFile(m.savePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			m.logger.Debug("no tasks file found, creating with help tasks")
-			m.tasks = m.getHelpTasks()
-			if saveErr := m.saveTasksLocked(); saveErr != nil {
-				m.logger.Error("failed to save initial help tasks", slog.String("error", saveErr.Error()))
-			}
-			return nil
-		}
-		return err
-	}
-
-	if err := json.Unmarshal(data, &m.tasks); err != nil {
-		return err
-	}
-
-	m.logger.Info("tasks loaded", slog.String("path", m.savePath), slog.Int("count", len(m.tasks)))
-	return nil
 }
 
 // SaveTasks 保存任务
