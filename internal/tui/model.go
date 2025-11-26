@@ -55,11 +55,7 @@ type Model struct {
 	currentPage PageType
 
 	// 页面实例
-	welcomePage  *pages.WelcomePage
-	mainPage     *pages.MainPage
-	todoPage     *todolist.ListPage
-	settingsPage pages.Page
-	aboutPage    pages.Page
+	pages map[PageType]pages.Page
 
 	// 通知
 	notification      string
@@ -83,14 +79,15 @@ func NewModel(logger *slog.Logger, cfg Config) *Model {
 		currentPage: PageWelcome,
 		logger:      logger.With("module", "tui-model"),
 		help:        help.New(),
+		pages:       make(map[PageType]pages.Page),
 	}
 
 	// 初始化页面
-	m.welcomePage = pages.NewWelcomePage()
-	m.mainPage = pages.NewMainPage()
-	m.todoPage = todolist.NewListPage(logger, cfg.TasksSavePath)
-	m.settingsPage = settings.NewSettingsPage()
-	m.aboutPage = about.NewAboutPage()
+	m.pages[PageWelcome] = pages.NewWelcomePage()
+	m.pages[PageMain] = pages.NewMainPage()
+	m.pages[PageTodo] = todolist.NewListPage(logger, cfg.TasksSavePath)
+	m.pages[PageSettings] = settings.NewSettingsPage()
+	m.pages[PageAbout] = about.NewAboutPage()
 
 	return m
 }
@@ -99,10 +96,14 @@ func NewModel(logger *slog.Logger, cfg Config) *Model {
 func (m Model) Init() tea.Cmd {
 	// 启动欢迎页的定时器
 	// 同时初始化 Todo 页面（加载数据）
-	return tea.Batch(
-		m.welcomePage.Init(),
-		m.todoPage.Init(),
-	)
+	var cmds []tea.Cmd
+	if p, ok := m.pages[PageWelcome]; ok {
+		cmds = append(cmds, p.Init())
+	}
+	if p, ok := m.pages[PageTodo]; ok {
+		cmds = append(cmds, p.Init())
+	}
+	return tea.Batch(cmds...)
 }
 
 // Update 实现 tea.Model 接口
@@ -118,11 +119,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		contentHeight := m.getContentHeight()
 		contentWidth := m.width
 
-		m.welcomePage.SetSize(contentWidth, contentHeight)
-		m.mainPage.SetSize(contentWidth, contentHeight)
-		m.todoPage.SetSize(contentWidth, contentHeight)
-		m.settingsPage.SetSize(contentWidth, contentHeight)
-		m.aboutPage.SetSize(contentWidth, contentHeight)
+		for _, p := range m.pages {
+			p.SetSize(contentWidth, contentHeight)
+		}
 
 		m.logger.Debug("window size changed",
 			slog.Int("width", m.width),
@@ -183,36 +182,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case todolist.TasksLoadedMsg:
-		newModel, cmd := m.todoPage.Update(msg)
-		m.todoPage = newModel.(*todolist.ListPage)
-		return m, cmd
+		if p, ok := m.pages[PageTodo]; ok {
+			newModel, cmd := p.Update(msg)
+			m.pages[PageTodo] = newModel.(pages.Page)
+			return m, cmd
+		}
 	}
 
 	// 将消息传递给当前页面
-	switch m.currentPage {
-	case PageWelcome:
-		newModel, cmd := m.welcomePage.Update(msg)
-		m.welcomePage = newModel.(*pages.WelcomePage)
-		cmds = append(cmds, cmd)
-
-	case PageMain:
-		newModel, cmd := m.mainPage.Update(msg)
-		m.mainPage = newModel.(*pages.MainPage)
-		cmds = append(cmds, cmd)
-
-	case PageTodo:
-		newModel, cmd := m.todoPage.Update(msg)
-		m.todoPage = newModel.(*todolist.ListPage)
-		cmds = append(cmds, cmd)
-
-	case PageSettings:
-		newModel, cmd := m.settingsPage.Update(msg)
-		m.settingsPage = newModel.(pages.Page)
-		cmds = append(cmds, cmd)
-
-	case PageAbout:
-		newModel, cmd := m.aboutPage.Update(msg)
-		m.aboutPage = newModel.(pages.Page)
+	if p, ok := m.pages[m.currentPage]; ok {
+		newModel, cmd := p.Update(msg)
+		m.pages[m.currentPage] = newModel.(pages.Page)
 		cmds = append(cmds, cmd)
 	}
 
@@ -226,7 +206,9 @@ func (m Model) View() string {
 	}
 
 	if m.currentPage == PageWelcome {
-		return m.welcomePage.View()
+		if p, ok := m.pages[PageWelcome]; ok {
+			return p.View()
+		}
 	}
 
 	// Header
@@ -278,18 +260,10 @@ func (m Model) renderHeader() string {
 
 // renderContent 渲染内容
 func (m Model) renderContent() string {
-	switch m.currentPage {
-	case PageMain:
-		return m.mainPage.View()
-	case PageTodo:
-		return m.todoPage.View()
-	case PageSettings:
-		return m.settingsPage.View()
-	case PageAbout:
-		return m.aboutPage.View()
-	default:
-		return m.renderPlaceholder("❓ 未知页面", "页面不存在")
+	if p, ok := m.pages[m.currentPage]; ok {
+		return p.View()
 	}
+	return m.renderPlaceholder("❓ 未知页面", "页面不存在")
 }
 
 // renderFooter 渲染页脚
@@ -297,16 +271,9 @@ func (m Model) renderFooter() string {
 	sizeInfo := fmt.Sprintf("📐 终端尺寸: %dx%d", m.width, m.height)
 
 	var helpInfo string
-	switch m.currentPage {
-	case PageMain:
-		helpInfo = m.help.View(m.mainPage.Help())
-	case PageTodo:
-		helpInfo = m.help.View(m.todoPage.Help())
-	case PageSettings:
-		helpInfo = m.help.View(m.settingsPage.Help())
-	case PageAbout:
-		helpInfo = m.help.View(m.aboutPage.Help())
-	default:
+	if p, ok := m.pages[m.currentPage]; ok {
+		helpInfo = m.help.View(p.Help())
+	} else {
 		helpInfo = "q/ctrl+c: 退出"
 	}
 
