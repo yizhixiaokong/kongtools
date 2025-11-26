@@ -107,6 +107,27 @@ changelog-tag:
 	@echo "Generating CHANGELOG.md for tag $(TAG)..."
 	git-chglog -o CHANGELOG.md $(TAG)
 
+# 发布新版本：生成 CHANGELOG，提交并打标签
+release:
+	@if [ -z "$(TAG)" ]; then \
+		echo "Error: TAG is required. Usage: make release TAG=v1.0.0"; \
+		exit 1; \
+	fi
+	@if ! command -v git-chglog >/dev/null 2>&1; then \
+		echo "Error: git-chglog is not installed."; \
+		echo "Install it with: go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest"; \
+		exit 1; \
+	fi
+	@echo "Releasing version $(TAG)..."
+	@echo "1. Generating CHANGELOG.md..."
+	git-chglog -o CHANGELOG.md --next-tag $(TAG)
+	@echo "2. Committing CHANGELOG.md..."
+	git add CHANGELOG.md
+	git commit -m "chore(changelog): update changelog for $(TAG)"
+	@echo "3. Creating tag $(TAG)..."
+	git tag $(TAG)
+	@echo "Done! Don't forget to push: git push origin main --tags"
+
 # 显示帮助信息
 help:
 	@echo "Available targets:"
@@ -122,5 +143,6 @@ help:
 	@echo "  changelog-init  - Initialize git-chglog configuration"
 	@echo "  changelog       - Generate CHANGELOG.md from all commits"
 	@echo "  changelog-tag   - Generate CHANGELOG.md for specific tag (use TAG=v1.0.0)"
+	@echo "  release         - Generate CHANGELOG, commit, and tag a new version (use TAG=v1.0.0)"
 	@echo "  help            - Show this help"
 
