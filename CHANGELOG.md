@@ -2,8 +2,17 @@
 ## [Unreleased]
 
 
+<a name="v0.9.3"></a>
+## [v0.9.3] - 2026-02-13
+### Refactor
+- 完善项目文档并优化代码结构
+
+
 <a name="v0.9.2"></a>
 ## [v0.9.2] - 2025-11-26
+### Chore
+- **changelog:** update changelog for v0.9.2
+
 ### Feat
 - 添加图片预览功能，支持通过 URL 或本地路径加载图片
 
@@ -116,7 +125,8 @@
 - update welcome page
 
 
-[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.3...HEAD
+[v0.9.3]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.2...v0.9.3
 [v0.9.2]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.1...v0.9.2
 [v0.9.1]: https://github.com/yizhixiaokong/kongtools/compare/v0.9.0...v0.9.1
 [v0.9.0]: https://github.com/yizhixiaokong/kongtools/compare/v0.8.0...v0.9.0
