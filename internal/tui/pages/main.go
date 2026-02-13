@@ -14,7 +14,11 @@ import (
 	"kongtools/internal/tui/styles"
 )
 
-// MainPage 主菜单页面
+const (
+	// MainMenuListExtra 主菜单列表额外减去的高度
+	MainMenuListExtra = 4
+)
+
 type MainPage struct {
 	width  int
 	height int
@@ -22,19 +26,16 @@ type MainPage struct {
 	keys   mainKeyMap
 }
 
-// mainKeyMap 主菜单快捷键映射
 type mainKeyMap struct {
 	Enter key.Binding
 	Quit  key.Binding
 	Help  key.Binding
 }
 
-// ShortHelp 返回简短帮助信息
 func (k mainKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{k.Enter, k.Quit}
 }
 
-// FullHelp 返回完整帮助信息
 func (k mainKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Enter, k.Help},
@@ -57,7 +58,6 @@ var mainKeys = mainKeyMap{
 	),
 }
 
-// menuItem 菜单项
 type menuItem struct {
 	title       string
 	description string
@@ -68,7 +68,6 @@ func (i menuItem) Title() string       { return i.title }
 func (i menuItem) Description() string { return i.description }
 func (i menuItem) FilterValue() string { return i.title }
 
-// menuItemDelegate 菜单项委托
 type menuItemDelegate struct{}
 
 func (d menuItemDelegate) Height() int                             { return 2 }
@@ -82,13 +81,11 @@ func (d menuItemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 
 	var title, desc string
 	if index == m.Index() {
-		// 选中状态 - 使用更有科技感的箭头
 		title = styles.MenuSelectedStyle.Render(fmt.Sprintf("› %s", i.title))
 		desc = styles.MenuDescStyle.
 			Foreground(styles.ColorGreen).
 			Render(i.description)
 	} else {
-		// 普通状态
 		title = styles.MenuItemStyle.Render(fmt.Sprintf("  %s", i.title))
 		desc = styles.MenuDescStyle.Render(i.description)
 	}
@@ -96,7 +93,6 @@ func (d menuItemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 	fmt.Fprintf(w, "%s\n%s", title, desc)
 }
 
-// NewMainPage 创建主菜单页面
 func NewMainPage() *MainPage {
 	items := []list.Item{
 		menuItem{
@@ -135,19 +131,17 @@ func NewMainPage() *MainPage {
 	}
 }
 
-// Init 实现 Page 接口
 func (m *MainPage) Init() tea.Cmd {
 	return nil
 }
 
-// Update 实现 Page 接口
 func (m *MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.list.SetWidth(msg.Width)
-		m.list.SetHeight(msg.Height - 4)
+		m.list.SetHeight(msg.Height - MainMenuListExtra)
 
 	case tea.KeyMsg:
 		switch {
@@ -156,7 +150,6 @@ func (m *MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Enter):
 			i, ok := m.list.SelectedItem().(menuItem)
 			if ok {
-				// 发送页面切换消息
 				return m, func() tea.Msg {
 					return messages.SwitchPageMsg{Page: i.page}
 				}
@@ -169,11 +162,9 @@ func (m *MainPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// View 实现 Page 接口
 func (m *MainPage) View() string {
 	listView := m.list.View()
 
-	// 使用 lipgloss.Place 实现水平和垂直居中
 	return lipgloss.Place(
 		m.width,
 		m.height,
@@ -183,20 +174,17 @@ func (m *MainPage) View() string {
 	)
 }
 
-// Title 实现 Page 接口
 func (m *MainPage) Title() string {
 	return "主菜单"
 }
 
-// Help 实现 Page 接口
 func (m *MainPage) Help() help.KeyMap {
 	return m.keys
 }
 
-// SetSize 实现 Page 接口
 func (m *MainPage) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 	m.list.SetWidth(width)
-	m.list.SetHeight(height - 4)
+	m.list.SetHeight(height - MainMenuListExtra)
 }

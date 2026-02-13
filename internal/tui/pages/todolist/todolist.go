@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -54,28 +53,37 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 		return
 	}
 
-	str := fmt.Sprintf("%s", i.Title())
+	// 确定状态
+	isSelected := index == m.Index()
+	isCompleted := i.task.Completed
 
-	// 选中状态
-	fn := styles.TodoItemStyle.Render
-	if index == m.Index() {
-		fn = func(s ...string) string {
-			return styles.TodoSelectedStyle.Render("> " + strings.Join(s, " "))
-		}
-	} else {
-		fn = func(s ...string) string {
-			return styles.TodoItemStyle.Render("  " + strings.Join(s, " "))
-		}
+	// 选择对应的样式（4 种独立样式）
+	var style lipgloss.Style
+	switch {
+	case isSelected && isCompleted:
+		style = styles.TodoSelectedCompletedStyle
+	case isSelected:
+		style = styles.TodoSelectedStyle
+	case isCompleted:
+		style = styles.TodoCompletedStyle
+	default:
+		style = styles.TodoItemStyle
 	}
 
-	// 完成状态
+	// 构建复选框
 	checkbox := "[ ]"
-	if i.task.Completed {
+	if isCompleted {
 		checkbox = "[✓]"
-		str = styles.TodoCompletedStyle.Render(str)
 	}
 
-	fmt.Fprint(w, fn(checkbox, str))
+	// 构建前缀
+	prefix := "  "
+	if isSelected {
+		prefix = "> "
+	}
+
+	// 一次性渲染，避免样式嵌套
+	fmt.Fprint(w, style.Render(prefix+checkbox+" "+i.Title()))
 }
 
 // ListPage Todo List 页面
@@ -311,8 +319,8 @@ func (m *ListPage) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.tasks) > 0 && m.list.Index() >= 0 {
 				index := m.list.Index()
 				m.tasks[index].Completed = !m.tasks[index].Completed
-				// 重新生成列表项以更新显示
-				m.updateListItems()
+				// 增量更新：只更新这一个改变的任务
+				m.updateListItems(index)
 				// 保持选中位置
 				m.list.Select(index)
 				return m, m.scheduleSave()
@@ -335,17 +343,27 @@ func (m *ListPage) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateListItems 更新列表组件的数据
-func (m *ListPage) updateListItems() {
-	items := make([]list.Item, len(m.tasks))
-	for i, t := range m.tasks {
-		// 注意：这里需要传递指针，否则修改不会反映到原始切片
-		// 但由于我们每次都重新生成 items，所以直接传值也可以，
-		// 只要保证 m.tasks 是最新的。
-		// 为了在 item 方法中访问 Task，我们创建一个新的 Task 副本或指针
-		taskCopy := t // 复制一份
-		items[i] = item{task: &taskCopy}
+// changedIndices: 可选参数，指定哪些索引的任务改变了。
+//                 如果不提供或为空，则全量更新
+//                 如果提供，则只更新这些特定项
+func (m *ListPage) updateListItems(changedIndices ...int) {
+	// 如果没有提供索引，或者索引数量接近总数，则全量更新
+	if len(changedIndices) == 0 || len(changedIndices) >= len(m.tasks)/2 {
+		items := make([]list.Item, len(m.tasks))
+		for i, t := range m.tasks {
+			taskCopy := t // 复制一份
+			items[i] = item{task: &taskCopy}
+		}
+		m.list.SetItems(items)
+	} else {
+		// 增量更新：只更新改变的项目
+		for _, idx := range changedIndices {
+			if idx >= 0 && idx < len(m.tasks) {
+				taskCopy := m.tasks[idx]
+				m.list.SetItem(idx, item{task: &taskCopy})
+			}
+		}
 	}
-	m.list.SetItems(items)
 }
 
 // View 实现 Page 接口

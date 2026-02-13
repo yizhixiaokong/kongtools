@@ -31,6 +31,15 @@ const (
 	PageAbout
 )
 
+// 布局常量 - 消除魔法数字
+const (
+	HeaderHeight      = 1 // 头部高度
+	FooterHeight      = 2 // 页脚高度（包含尺寸信息和帮助）
+	SeparatorHeight   = 1 // 分隔线高度
+	TotalNonContent   = HeaderHeight + FooterHeight + SeparatorHeight*2
+	MainMenuListExtra = 4 // 主菜单列表额外减去的高度
+)
+
 func (p PageType) String() string {
 	switch p {
 	case PageWelcome:
@@ -331,7 +340,7 @@ func (m Model) renderPlaceholder(title, description string) string {
 
 // getContentHeight 获取内容区域高度
 func (m Model) getContentHeight() int {
-	return m.height - 5
+	return m.height - TotalNonContent
 }
 
 // clearNotificationAfter 延时清除通知

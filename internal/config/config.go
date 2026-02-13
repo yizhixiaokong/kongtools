@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -32,15 +31,16 @@ type config struct {
 	App tui.Config
 }
 
-func Config() config {
+func Config() (config, error) {
+	var err error
 	once.Do(func() {
-		initConfig()
+		err = initConfig()
 	})
-	return _config
+	return _config, err
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() {
+func initConfig() error {
 	var configFilePath string
 
 	if CfgFile != "" {
@@ -49,7 +49,7 @@ func initConfig() {
 		// Ensure the directory exists for custom config file
 		if dir := filepath.Dir(configFilePath); dir != "" && dir != "." {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
-				cobra.CheckErr(fmt.Errorf("failed to create config directory %s: %w", dir, err))
+				return fmt.Errorf("failed to create config directory %s: %w", dir, err)
 			}
 		}
 	} else {
@@ -65,10 +65,12 @@ func initConfig() {
 		// Check if error is because file doesn't exist
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok || os.IsNotExist(err) {
 			// Config file not found; create a new one
-			createDefaultConfig(configFilePath)
+			if err := createDefaultConfig(configFilePath); err != nil {
+				return err
+			}
 		} else {
 			// Config file was found but another error was produced
-			cobra.CheckErr(err)
+			return fmt.Errorf("failed to read config: %w", err)
 		}
 	}
 
@@ -77,9 +79,17 @@ func initConfig() {
 	// read in environment variables that match
 	viper.AutomaticEnv()
 	// Unmarshal the config into a struct
-	cobra.CheckErr(viper.Unmarshal(&_config))
+	if err := viper.Unmarshal(&_config); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// 验证并填充默认值
+	if err := _config.App.Validate(); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
 
 	// fmt.Printf("Config: %+v", _config) // Debug
+	return nil
 }
 
 // DefaultConfig returns the default configuration as a string
@@ -92,12 +102,17 @@ func DefaultConfig(configs ...string) (config string) {
 }
 
 // createDefaultConfig creates a default config file in the config directory
-func createDefaultConfig(configPath string) {
+func createDefaultConfig(configPath string) error {
 	// Directory is already ensured by paths.ConfigFile
 	// Write the default config to the file
-	cobra.CheckErr(os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, tui.DefaultConfig)), 0644))
+	if err := os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, tui.DefaultConfig)), 0644); err != nil {
+		return fmt.Errorf("failed to write default config: %w", err)
+	}
 
 	fmt.Fprintf(os.Stderr, "Created default config file: %s\n", configPath)
 	viper.SetConfigFile(configPath)
-	cobra.CheckErr(viper.ReadInConfig())
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read default config: %w", err)
+	}
+	return nil
 }

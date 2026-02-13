@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -24,6 +25,37 @@ import (
 type imageMsg struct{ output string }
 type imageErrMsg struct{ err error }
 type imageDownloadedMsg struct{ path string }
+
+// DownloadConfig 图片下载配置
+type DownloadConfig struct {
+	Timeout time.Duration // HTTP 请求超时时间
+	MaxSize int64         // 最大文件大小（字节）
+	TempDir string        // 临时文件目录（空则使用系统默认）
+}
+
+// DownloadOption 下载选项函数
+type DownloadOption func(*DownloadConfig)
+
+// WithTimeout 设置下载超时时间
+func WithTimeout(d time.Duration) DownloadOption {
+	return func(c *DownloadConfig) {
+		c.Timeout = d
+	}
+}
+
+// WithMaxSize 设置最大文件大小
+func WithMaxSize(size int64) DownloadOption {
+	return func(c *DownloadConfig) {
+		c.MaxSize = size
+	}
+}
+
+// WithTempDir 设置临时文件目录
+func WithTempDir(dir string) DownloadOption {
+	return func(c *DownloadConfig) {
+		c.TempDir = dir
+	}
+}
 
 // 页面状态
 type pageState int
@@ -134,11 +166,14 @@ func NewImagePage() *ImagePage {
 }
 
 // cleanup 清理临时文件
-func (m *ImagePage) cleanup() {
+func (m *ImagePage) cleanup() error {
 	if m.tempFilePath != "" {
-		os.Remove(m.tempFilePath)
+		if err := os.Remove(m.tempFilePath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove temp file %s: %w", m.tempFilePath, err)
+		}
 		m.tempFilePath = ""
 	}
+	return nil
 }
 
 func (m *ImagePage) Init() tea.Cmd {
@@ -360,29 +395,82 @@ func resolveLocalPath(input string) string {
 }
 
 // downloadImage 下载图片
-func downloadImage(url string) tea.Msg {
+// 使用函数选项模式配置下载参数
+func downloadImage(url string, opts ...DownloadOption) tea.Msg {
+	// 默认配置
+	config := DownloadConfig{
+		Timeout: 30 * time.Second,
+		MaxSize: 50 * 1024 * 1024, // 50MB
+		TempDir: "",                // 使用系统默认临时目录
+	}
+
+	// 应用所有选项
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	// 创建临时文件
-	tmpFile, err := os.CreateTemp("", "bubbletea-img-*.jpg")
+	tempPattern := "bubbletea-img-*.jpg"
+	var tmpFile *os.File
+	var err error
+
+	if config.TempDir != "" {
+		tmpFile, err = os.CreateTemp(config.TempDir, tempPattern)
+	} else {
+		tmpFile, err = os.CreateTemp("", tempPattern)
+	}
+
 	if err != nil {
 		return imageErrMsg{err}
 	}
-	defer tmpFile.Close()
+	tmpFileName := tmpFile.Name()
 
-	// 下载图片
-	resp, err := http.Get(url)
+	// 创建带超时的 HTTP 客户端
+	client := &http.Client{
+		Timeout: config.Timeout,
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
-		os.Remove(tmpFile.Name())
-		return imageErrMsg{err}
+		tmpFile.Close()
+		os.Remove(tmpFileName)
+		return imageErrMsg{fmt.Errorf("failed to download image: %w", err)}
 	}
 	defer resp.Body.Close()
 
-	// 保存到临时文件
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		os.Remove(tmpFile.Name())
-		return imageErrMsg{err}
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		tmpFile.Close()
+		os.Remove(tmpFileName)
+		return imageErrMsg{fmt.Errorf("bad status: %s", resp.Status)}
 	}
 
-	return imageDownloadedMsg{path: tmpFile.Name()}
+	// 检查大小（通过 Content-Length）
+	if resp.ContentLength > config.MaxSize {
+		tmpFile.Close()
+		os.Remove(tmpFileName)
+		return imageErrMsg{fmt.Errorf("image too large: %d bytes (max %d)",
+			resp.ContentLength, config.MaxSize)}
+	}
+
+	// 使用 LimitReader 防止下载超过限制
+	limitedReader := io.LimitReader(resp.Body, config.MaxSize+1)
+	written, err := io.Copy(tmpFile, limitedReader)
+	tmpFile.Close()
+
+	if err != nil {
+		os.Remove(tmpFileName)
+		return imageErrMsg{fmt.Errorf("failed to save image: %w", err)}
+	}
+
+	// 检查是否超过大小限制
+	if written > config.MaxSize {
+		os.Remove(tmpFileName)
+		return imageErrMsg{fmt.Errorf("image exceeds size limit: %d bytes (max %d)",
+			written, config.MaxSize)}
+	}
+
+	return imageDownloadedMsg{path: tmpFileName}
 }
 
 // convertImage 调用 chafa 转换图片

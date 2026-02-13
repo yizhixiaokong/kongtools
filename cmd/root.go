@@ -24,12 +24,18 @@ var rootCmd = &cobra.Command{
 }
 
 func rootRun(cmd *cobra.Command, args []string) {
+	cfg, err := config.Config()
+	if err != nil {
+		slog.Error("failed to load config", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
 	slog.Debug("run app start ...")
-	app := tui.NewApp(slog.Default(), config.Config().App)
+	app := tui.NewApp(slog.Default(), cfg.App)
 
 	if err := app.Run(); err != nil {
 		slog.Error("run app error", slog.String("error", err.Error()))
-		return
+		os.Exit(1)
 	}
 }
 
@@ -44,7 +50,11 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(func() {
-		cfg := config.Config() // init config
+		cfg, err := config.Config() // init config
+		if err != nil {
+			slog.Error("failed to load config", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
 		log.InitLogger(cfg.Log)
 		sysinfo.PrintSystemInfo() // print system info after all initialization
 	})

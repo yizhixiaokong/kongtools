@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"kongtools/internal/tui/keys"
 	"kongtools/internal/tui/messages"
 	"kongtools/internal/tui/styles"
 )
@@ -19,8 +20,7 @@ type SettingsPage struct {
 
 // settingsKeyMap 设置页面快捷键
 type settingsKeyMap struct {
-	Back key.Binding
-	Quit key.Binding
+	keys.CommonKeyMap
 }
 
 // ShortHelp 返回简短帮助信息
@@ -36,14 +36,7 @@ func (k settingsKeyMap) FullHelp() [][]key.Binding {
 }
 
 var settingsKeys = settingsKeyMap{
-	Back: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "返回"),
-	),
-	Quit: key.NewBinding(
-		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "退出"),
-	),
+	CommonKeyMap: keys.NewCommonKeyMap(),
 }
 
 // NewSettingsPage 创建设置页面
@@ -106,19 +99,8 @@ func (m *SettingsPage) View() string {
 		backHint,
 	)
 
-	// 垂直居中
-	contentHeight := lipgloss.Height(content)
-	topPadding := (m.height - contentHeight) / 2
-	if topPadding < 0 {
-		topPadding = 0
-	}
-
-	paddingStyle := lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Align(lipgloss.Center, lipgloss.Center)
-
-	return paddingStyle.Render(content)
+	// 使用通用居中函数
+	return styles.CenterVertically(content, m.width, m.height)
 }
 
 // Title 实现 Page 接口

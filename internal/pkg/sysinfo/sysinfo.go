@@ -33,7 +33,11 @@ func PrintSystemInfo() {
 	slog.Info("Cache directory", slog.String("path", dirs.Cache))
 
 	// 打印日志配置信息
-	cfg := config.Config()
+	cfg, err := config.Config()
+	if err != nil {
+		slog.Error("failed to get config for logging", slog.String("error", err.Error()))
+		return
+	}
 	slog.Info("Log configuration",
 		slog.String("level", cfg.Log.Level),
 		slog.Bool("addSource", cfg.Log.AddSource),
