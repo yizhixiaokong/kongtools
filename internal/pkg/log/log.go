@@ -10,26 +10,29 @@ import (
 )
 
 type Config struct {
-	Level        string
-	AddSource    bool
-	Filename     string
-	MaxSize      int
-	MaxBackups   int
-	MaxAge       int
-	RotateAtInit bool
-	MultiWriter  bool
+	Level        string `mapstructure:"level" yaml:"level"`
+	AddSource    bool   `mapstructure:"addSource" yaml:"addSource"`
+	Filename     string `mapstructure:"filename" yaml:"filename"`
+	MaxSize      int    `mapstructure:"maxSize" yaml:"maxSize"`
+	MaxBackups   int    `mapstructure:"maxBackups" yaml:"maxBackups"`
+	MaxAge       int    `mapstructure:"maxAge" yaml:"maxAge"`
+	RotateAtInit bool   `mapstructure:"rotateAtInit" yaml:"rotateAtInit"`
+	MultiWriter  bool   `mapstructure:"multiWriter" yaml:"multiWriter"`
 }
 
-const DefaultConfig = `log:
-  level: debug
-  addSource: true
-  filename: logs/kongtools.log
-  maxSize: 10
-  maxBackups: 3
-  maxAge: 7
-  rotateAtInit: true
-  multiWriter: false
-`
+// Default returns a Config with default values
+func Default() *Config {
+	return &Config{
+		Level:        "debug",
+		AddSource:    true,
+		Filename:     "logs/kongtools.log",
+		MaxSize:      10,
+		MaxBackups:   3,
+		MaxAge:       7,
+		RotateAtInit: true,
+		MultiWriter:  false,
+	}
+}
 
 // InitLogger 初始化日志
 func InitLogger(cfg Config) {

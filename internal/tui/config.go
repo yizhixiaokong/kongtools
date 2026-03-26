@@ -4,17 +4,12 @@ import "kongtools/internal/pkg/paths"
 
 // Config TUI 配置
 type Config struct {
-	TasksSavePath string
+	TasksSavePath string `mapstructure:"tasksSavePath" yaml:"tasksSavePath"`
 }
 
-// DefaultConfig 默认配置 YAML
-const DefaultConfig = `app:
-  tasksSavePath: 
-`
-
-// NewConfig 创建默认配置
-func NewConfig() Config {
-	return Config{
+// Default returns a Config with default values
+func Default() *Config {
+	return &Config{
 		TasksSavePath: paths.DataFile("tasks.json"),
 	}
 }

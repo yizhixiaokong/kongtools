@@ -1,22 +1,22 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
-	"kongtools/internal/pkg/log"
-	"kongtools/internal/pkg/paths"
-	"kongtools/internal/tui"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
+	"kongtools/internal/pkg/log"
+	"kongtools/internal/pkg/paths"
+	"kongtools/internal/tui"
 )
 
 const (
-	// Define default configuration
-	defaultCfgStr = `# Default configuration`
-	appName       = "kongtools"
-	configName    = "config"
+	appName    = "kongtools"
+	configName = "config"
 )
 
 var (
@@ -27,8 +27,8 @@ var (
 )
 
 type config struct {
-	Log log.Config
-	App tui.Config
+	Log log.Config `mapstructure:"log"`
+	App tui.Config `mapstructure:"app"`
 }
 
 func Config() (config, error) {
@@ -88,24 +88,37 @@ func initConfig() error {
 		return fmt.Errorf("failed to validate config: %w", err)
 	}
 
-	// fmt.Printf("Config: %+v", _config) // Debug
 	return nil
 }
 
-// DefaultConfig returns the default configuration as a string
-func DefaultConfig(configs ...string) (config string) {
-	config = defaultCfgStr
-	for _, cfg := range configs {
-		config += "\n" + cfg
-	}
-	return
-}
-
-// createDefaultConfig creates a default config file in the config directory
+// createDefaultConfig creates a default config file using yaml.Marshal
 func createDefaultConfig(configPath string) error {
-	// Directory is already ensured by paths.ConfigFile
-	// Write the default config to the file
-	if err := os.WriteFile(configPath, []byte(DefaultConfig(log.DefaultConfig, tui.DefaultConfig)), 0644); err != nil {
+	// Build default config from all sub-packages
+	defaultCfg := config{
+		Log: *log.Default(),
+		App: *tui.Default(),
+	}
+
+	// Marshal to YAML with 2-space indentation
+	var buf bytes.Buffer
+	encoder := yaml.NewEncoder(&buf)
+	encoder.SetIndent(2) // Use 2-space indentation
+	if err := encoder.Encode(defaultCfg); err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	if err := encoder.Close(); err != nil {
+		return fmt.Errorf("failed to close encoder: %w", err)
+	}
+
+	// Prepend header
+	defaultContent := "# KongTools Configuration\n\n" + buf.String()
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, []byte(defaultContent), 0644); err != nil {
 		return fmt.Errorf("failed to write default config: %w", err)
 	}
 
